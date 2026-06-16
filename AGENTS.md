@@ -98,7 +98,7 @@ glabel/
 <!-- Do NOT change these without re-verifying. See README §Perintah Project. -->
 Frontend: `cd frontend && npm install && npm run dev` (Vite → :3000).
 Backend (run from project root): `python -m venv .venv`, `.\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt`, `.\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload` (:8000), `.\.venv\Scripts\python.exe -m pytest backend/tests/ -v`.
-Full local app: `.\scripts\start-dev.ps1` to start backend + frontend, `.\scripts\stop-dev.ps1` to stop them.
+Full local app: install dependencies manually first, then `.\scripts\start-dev.ps1` to start backend + frontend, `.\scripts\stop-dev.ps1` to stop them.
 
 ## Coding Conventions · `[KEEP UPDATED]`
 

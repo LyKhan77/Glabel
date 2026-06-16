@@ -107,9 +107,8 @@ python -m venv .venv
 
 **Full local app** (run from the **project root**, Windows PowerShell):
 ```powershell
-.\scripts\start-dev.ps1              # starts backend + frontend, installs backend deps
-.\scripts\start-dev.ps1 -SkipInstall # faster restart when deps are already installed
-.\scripts\stop-dev.ps1               # stops backend + frontend started by the script
+.\scripts\start-dev.ps1 # starts backend + frontend after deps are installed manually
+.\scripts\stop-dev.ps1  # stops backend + frontend started by the script
 ```
 
 > Run the backend from the project root (not from inside `backend/`): the app is a package (`uvicorn backend.main:app`), so imports like `from backend.core.storage import ...` resolve correctly.

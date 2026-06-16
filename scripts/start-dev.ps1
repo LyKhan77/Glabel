@@ -1,7 +1,6 @@
 param(
     [int]$BackendPort = 8000,
     [string]$DataDir = "",
-    [switch]$SkipInstall,
     [switch]$KeepExisting
 )
 
@@ -20,13 +19,7 @@ if (-not $KeepExisting -and (Test-Path $StopScript)) {
 }
 
 if (-not (Test-Path $VenvPython)) {
-    Write-Host "Creating backend virtual environment..."
-    & python -m venv (Join-Path $Root ".venv")
-}
-
-if (-not $SkipInstall) {
-    Write-Host "Installing backend requirements..."
-    & $VenvPython -m pip install -r (Join-Path $Root "backend\requirements.txt")
+    throw "Backend virtual environment not found. Run manually: python -m venv .venv; .\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt"
 }
 
 if ([string]::IsNullOrWhiteSpace($DataDir)) {
