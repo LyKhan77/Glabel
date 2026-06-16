@@ -2,7 +2,7 @@
   <div class="workspace-layout">
     <header class="toolbar">
       <button class="btn" @click="goHome">
-        <span class="icon">[<]</span> Back to Home
+        <span class="icon">[<]</span> Back to Playgrounds
       </button>
       <div class="toolbar-title">[Glabel] Workspace</div>
       <div class="toolbar-actions">
@@ -33,6 +33,10 @@
             <OutputNode :data="props.data" />
           </template>
         </VueFlow>
+        <div class="canvas-tools">
+          <button class="btn sm-btn" @click="zoomIn">[+] Zoom In</button>
+          <button class="btn sm-btn" @click="zoomOut">[-] Zoom Out</button>
+        </div>
       </main>
       
       <aside class="properties-panel">
@@ -60,7 +64,7 @@ import '@vue-flow/core/dist/theme-default.css'
 const router = useRouter()
 
 const goHome = () => {
-  router.push('/')
+  router.push('/playgrounds')
 }
 
 const nodes = ref([
@@ -74,7 +78,7 @@ const edges = ref([
   { id: 'e2-3', source: '2', target: '3' }
 ])
 
-const { project } = useVueFlow()
+const { project, zoomIn, zoomOut } = useVueFlow()
 let id = 4
 
 const onDragStart = (event, nodeType) => {
@@ -121,8 +125,8 @@ const deployPipeline = () => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #fdfcfc;
-  color: #201d1d;
+  background-color: var(--bg-color, #fdfcfc);
+  color: var(--text-color, #201d1d);
   font-family: 'Berkeley Mono', monospace;
   overflow: hidden;
 }
@@ -132,8 +136,8 @@ const deployPipeline = () => {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 1rem;
-  border-bottom: 1px solid #646262;
-  background-color: #fdfcfc;
+  border-bottom: 1px solid var(--border-color, #646262);
+  background-color: var(--bg-color, #fdfcfc);
   height: 50px;
   box-sizing: border-box;
 }
@@ -149,11 +153,12 @@ const deployPipeline = () => {
 
 .btn {
   background: transparent;
-  color: #201d1d;
-  border: 1px solid #646262;
+  color: var(--text-color, #201d1d);
+  border: 1px solid var(--border-color, #646262);
   border-radius: 4px;
   padding: 0.25rem 0.75rem;
-  font-family: 'Berkeley Mono', monospace;
+  font-family: inherit;
+  font-size: inherit;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -161,8 +166,13 @@ const deployPipeline = () => {
 }
 
 .btn:hover {
-  background: #201d1d;
-  color: #fdfcfc;
+  background: var(--text-color, #201d1d);
+  color: var(--bg-color, #fdfcfc);
+}
+
+.sm-btn {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.85rem;
 }
 
 .main-area {
@@ -173,31 +183,41 @@ const deployPipeline = () => {
 
 .node-palette {
   width: 250px;
-  border-right: 1px solid #646262;
-  background-color: #fdfcfc;
+  border-right: 1px solid var(--border-color, #646262);
+  background-color: var(--bg-color, #fdfcfc);
   display: flex;
   flex-direction: column;
 }
 
 .canvas-area {
   flex: 1;
-  background-color: #fdfcfc;
+  background-color: var(--bg-color, #fdfcfc);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
   position: relative;
+}
+
+.canvas-tools {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  z-index: 10;
 }
 
 .properties-panel {
   width: 300px;
-  border-left: 1px solid #646262;
-  background-color: #fdfcfc;
+  border-left: 1px solid var(--border-color, #646262);
+  background-color: var(--bg-color, #fdfcfc);
   display: flex;
   flex-direction: column;
 }
 
 .panel-header {
   padding: 0.5rem 1rem;
-  border-bottom: 1px solid #646262;
+  border-bottom: 1px solid var(--border-color, #646262);
   font-weight: bold;
-  background-color: rgba(15,0,0,0.02);
+  background-color: var(--hover-bg, rgba(15,0,0,0.02));
 }
 
 .palette-items {
@@ -208,14 +228,14 @@ const deployPipeline = () => {
 }
 
 .palette-item {
-  border: 1px solid #646262;
+  border: 1px solid var(--border-color, #646262);
   padding: 0.5rem;
   cursor: grab;
-  background-color: #fdfcfc;
+  background-color: var(--bg-color, #fdfcfc);
 }
 
 .palette-item:hover {
-  background-color: rgba(15,0,0,0.05);
+  background-color: var(--hover-bg, rgba(15,0,0,0.05));
 }
 
 .properties-content {
