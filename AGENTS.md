@@ -15,7 +15,7 @@ Open-source, **local-first** visual pipeline builder for Computer Vision (ComfyU
 
 - **Local-first philosophy:** no remote services, no SQL database. State = flat JSON files under `./glabel_data`.
 - **Simplicity & surgical changes** are mandatory (see RULES + behavioral guidelines below).
-- **Plan before code:** brainstorm → spec → plan → execute. Save plans to `docs/temp_docs/plans/` (never commit them).
+- **Plan before code:** brainstorm → spec → plan → execute. Save plans to `docs/plans/` (never commit them).
 - **Atomic persistence:** all state mutations go through `storage.update_json` — never read+manual-write.
 - **Commit per logical change**; roll back via git history.
 - **Keep docs in sync:** update README + AGENTS "Current State" as part of every change.
@@ -41,7 +41,7 @@ Open-source, **local-first** visual pipeline builder for Computer Vision (ComfyU
 - `backend/services/projects.py` — CRUD logic via `update_json`.
 - `backend/schemas/project.py` — Pydantic models.
 - `backend/tests/` — pytest (`test_storage.py`, `test_projects_api.py`).
-- `docs/temp_docs/{plans,superpowers/specs}` — working artifacts (gitignored, NOT committed).
+- `docs/{plans,superpowers/specs}` — working artifacts (gitignored, NOT committed).
 - See README §Project Structure for the full tree.
 
 ## Perintah Project (Commands) · `[DO NOT CHANGE — canonical, verified]`
@@ -60,8 +60,8 @@ Backend (run from project root): `python -m pip install -r backend/requirements.
 
 ## Workflow · `[KEEP UPDATED]`
 
-1. Brainstorm (superpowers:brainstorming) → spec in `docs/temp_docs/superpowers/specs/`.
-2. Plan (superpowers:writing-plans) → `docs/temp_docs/plans/` (NOT committed).
+1. Brainstorm (superpowers:brainstorming) → spec in `docs/superpowers/specs/`.
+2. Plan (superpowers:writing-plans) → `docs/plans/` (NOT committed).
 3. Execute task-by-task (superpowers:subagent-driven-development): implementer → spec review → quality review → commit.
 4. Finish branch (superpowers:finishing-a-development-branch) → push + PR.
 5. Update README + this file's Current State.
@@ -82,7 +82,7 @@ Backend (run from project root): `python -m pip install -r backend/requirements.
 - `[DO NOT CHANGE]` command list is canonical; only change after verifying it runs.
 - README.md is the detailed canonical doc; AGENTS.md is the fast agent orientation.
 - Changelog entries are dated `YYYY-MM-DD`, append-only.
-- Do **not** commit `docs/temp_docs/`.
+- Do **not** commit `docs/`.
 
 ===========================
 

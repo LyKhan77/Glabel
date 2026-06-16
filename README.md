@@ -73,7 +73,7 @@ glabel/
 │  ├─ schemas/project.py      # Pydantic models
 │  ├─ tests/                  # pytest: test_storage.py, test_projects_api.py
 │  └─ requirements.txt
-├─ docs/temp_docs/            # plans + specs (gitignored — NOT committed)
+├─ docs/            # plans + specs (gitignored — NOT committed)
 ├─ DESIGN.md                  # frontend visual design reference
 ├─ AGENTS.md                  # agent + project operating manual
 └─ README.md                  # this file
@@ -121,12 +121,12 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 - **TDD:** write the failing test first, implement, then green. pytest + httpx `TestClient`.
 - **Config via env at call time** (`GLABEL_DATA_DIR`) so tests isolate with `monkeypatch` + `tmp_path`.
 - **Surgical, minimal changes**; match existing style; no speculative abstraction (see AGENTS.md §Simplicity / §Surgical).
-- **Commit per logical change**; never commit `docs/temp_docs/` plans.
+- **Commit per logical change**; never commit `docs/` plans.
 
 ## Workflow  ·  `[KEEP UPDATED]`
 
-1. **Brainstorm** the feature (superpowers:brainstorming) → write a spec in `docs/temp_docs/superpowers/specs/`.
-2. **Plan** step-by-step (superpowers:writing-plans) → save to `docs/temp_docs/plans/`. *(Plans are NOT committed.)*
+1. **Brainstorm** the feature (superpowers:brainstorming) → write a spec in `docs/superpowers/specs/`.
+2. **Plan** step-by-step (superpowers:writing-plans) → save to `docs/plans/`. *(Plans are NOT committed.)*
 3. **Execute** task-by-task (superpowers:subagent-driven-development): implementer → spec review → quality review → commit.
 4. **Finish** the branch (superpowers:finishing-a-development-branch) → push + PR.
 5. **Update docs** (README + AGENTS "Current State") as part of the change.
@@ -166,4 +166,4 @@ This README and `AGENTS.md` are **living documents**. Keep them accurate:
 Rules:
 - The **Perintah Project** command list is **canonical** — only change after verifying it runs.
 - **Changelog** entries are dated (`YYYY-MM-DD`) and append-only.
-- Do **not** commit files under `docs/temp_docs/` (plans/specs are working artifacts).
+- Do **not** commit files under `docs/` (plans/specs are working artifacts).
