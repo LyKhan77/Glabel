@@ -55,3 +55,42 @@ Untuk kompatibilitas maksimal di berbagai perangkat (Windows/Linux/Mac), Backend
 - Sesuai `DESIGN.md`: font *Berkeley Mono*, desain kaku (*austere*), tanpa elemen *drop shadow*, latar *cream* (`#fdfcfc`), border *hairline*, tombol kotak radius 4px (`rounded.sm`).
 - **Logo**: Menggunakan konsep *Block-Pixel Eye* tanpa teks.
 - **Infinite Canvas**: Dibangun di atas library `VueFlow` yang sudah dikustomisasi sesuai pedoman *DESIGN.md*.
+
+## 8. Information Architecture (IA) & Navigation Flow
+
+### 8.1. App Map / Wireflow (Launcher-to-Fullscreen)
+Glabel menggunakan pendekatan **Launcher-to-Fullscreen**. Dashboard bertindak sebagai titik awal (Launcher) yang steril. Saat pengguna memasuki *Workspace* (baik baru maupun *load*), *Workspace* akan mengambil alih seluruh layar (*fullscreen*) tanpa interupsi navigasi dari Dashboard.
+
+```text
+[ DASHBOARD (Home) ]
+  ├── Section: New Project
+  │    └── Button: [+] New Inference Playground  ──(Klik)──>  Membuka WORKSPACE (Blank)
+  ├── Section: Load Project
+  │    └── Button: [Folder] Open Vision Solution ──(Klik)──>  Membuka WORKSPACE (Loaded)
+  └── Section: Recent Workspaces
+       └── List of .glabel files                 ──(Klik)──>  Membuka WORKSPACE (Loaded)
+
+[ FULLSCREEN WORKSPACE (Canvas) ]
+  ├── Top Toolbar
+  │    ├── Tombol "Back to Home"                 ──(Klik)──>  Kembali ke DASHBOARD
+  │    ├── Hardware Target Dropdown (CPU/GPU)
+  │    ├── Workspace Name & Save State (.glabel)
+  │    └── Export Button
+  ├── Left Sidebar: Node Palette (Draggable)
+  │    └── Input, Preprocessing, Inference, Logic, Output Nodes
+  ├── Center: Infinite Canvas (VueFlow)
+  │    └── Tempat merangkai Node (Mendukung Hybrid Wire: Manual & Auto-connect)
+  └── Right Sidebar: Properties Panel
+       └── (Muncul saat Node diklik) Menampilkan detail parameter dan metrik latensi
+```
+
+### 8.2. Task Flow: Inference Playground (Sandbox Mode)
+1. **Launch & Setup**: Buka aplikasi ➔ Tampil Dashboard ➔ Klik `[+] New Inference Playground`.
+2. **Hardware Target Selection**: Secara *default*, sistem mendeteksi GPU. Jika perlu, *user* dapat menggantinya (CPU/MPS) lewat Toolbar.
+3. **Node Construction (Hybrid Wire)**:
+   - *User* men-drag Node dari Palette (Kiri) ke Canvas (Tengah).
+   - **Koneksi Manual (Default)**: *User* menarik kabel dari ujung (*port*) Node ke Node lain.
+   - **Koneksi Auto-connect**: Memungkinkan *user* untuk menggunakan *shortcut* (misal: tekan `Shift` sambil men-drop Node baru) untuk menyambungkan Node secara otomatis ke Node terdekat/sebelumnya. Hal ini mempercepat pembuatan *linear pipeline*.
+4. **Real-time Tuning**: Parameter diubah di Properties Panel (Kanan), *output* video/gambar dan metrik latensi pada Node akan ter-update secara *real-time*.
+
+*(Catatan: Desain antarmuka (UI) final akan mengacu pada kaidah premium dan fungsional seperti yang direkomendasikan pada skill `ui-ux-pro-max` / `impeccable`)*
