@@ -2,48 +2,50 @@
   <div class="dashboard-container">
     <header class="header">
       <h1>[Glabel]</h1>
-      <p>Computer Vision Node-Based Pipeline Builder</p>
+      <p>Open Vision Studio</p>
+      <button class="btn action-btn" @click="showModal = true">
+        <span class="icon">[+]</span> New Project
+      </button>
     </header>
 
     <main class="main-content">
-      <section class="actions-section">
-        <h2>Actions</h2>
-        <div class="actions">
-          <button class="btn action-btn" @click="newPlayground">
-            <span class="icon">[+]</span> New Inference Playground
-          </button>
-          <button class="btn action-btn" @click="openVisionSolution">
-            <span class="icon">[Folder]</span> Open Vision Solution
-          </button>
+      <section class="projects-section">
+        <h2>Open Vision Projects</h2>
+        <div class="projects-grid">
+          <div class="project-card" v-for="project in openVisionProjects" :key="project.id" @click="openProject(project.id)">
+            <h3>{{ project.name }}</h3>
+            <p class="path">{{ project.description }}</p>
+          </div>
         </div>
       </section>
-
-      <section class="recent-workspaces-section">
-        <h2>Recent Workspaces</h2>
-        <table class="workspace-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Path</th>
-              <th>Last Modified</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="ws in recentWorkspaces" :key="ws.id">
-              <td>{{ ws.id }}</td>
-              <td>{{ ws.name }}</td>
-              <td class="path">{{ ws.path }}</td>
-              <td>{{ ws.lastModified }}</td>
-              <td>
-                <button class="btn sm-btn" @click="removeWorkspace(ws.id)">[-] Remove</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
     </main>
+
+    <!-- Modal Overlay -->
+    <div v-if="showModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Create New Project</h2>
+          <button class="btn sm-btn" @click="showModal = false">[x] Close</button>
+        </div>
+        <div class="modal-split">
+          <!-- Left Column -->
+          <div class="modal-col">
+            <h3>AI Assistant</h3>
+            <textarea v-model="aiPrompt" placeholder="Describe your vision pipeline..."></textarea>
+            <button class="btn" @click="submitNewProject">Generate Pipeline</button>
+          </div>
+          <!-- Right Column -->
+          <div class="modal-col">
+            <h3>Manual Tasks</h3>
+            <div class="task-grid">
+              <button class="btn" @click="submitNewProject">Object Detection</button>
+              <button class="btn" @click="submitNewProject">Segmentation</button>
+              <button class="btn" @click="submitNewProject">OCR</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -53,22 +55,21 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-const newPlayground = () => {
-  router.push('/workspace')
-}
+const showModal = ref(false)
+const aiPrompt = ref('')
 
-const openVisionSolution = () => {
-  router.push('/journey')
-}
-
-const recentWorkspaces = ref([
-  { id: 'ws-001', name: 'Face Detection Prod', path: '/home/user/glabel-projects/face-detect', lastModified: '2026-06-15 14:32' },
-  { id: 'ws-002', name: 'Object Tracking Test', path: '/home/user/glabel-projects/obj-track', lastModified: '2026-06-14 09:15' },
-  { id: 'ws-003', name: 'OCR Pipeline', path: '/home/user/glabel-projects/ocr-pipe', lastModified: '2026-06-10 11:45' }
+const openVisionProjects = ref([
+  { id: 'proj-001', name: 'PPE Detection', description: 'Detect hardhats and vests' },
+  { id: 'proj-002', name: 'OCR License Plate', description: 'Extract text from vehicle plates' }
 ])
 
-const removeWorkspace = (id) => {
-  recentWorkspaces.value = recentWorkspaces.value.filter(ws => ws.id !== id)
+const openProject = (id) => {
+  router.push(`/project/${id}`)
+}
+
+const submitNewProject = () => {
+  showModal.value = false
+  router.push('/project/new')
 }
 </script>
 
@@ -77,9 +78,15 @@ const removeWorkspace = (id) => {
   padding: 2rem;
   max-width: 1200px;
   margin: 0 auto;
+  font-family: 'Berkeley Mono', monospace;
+  color: #201d1d;
+  background-color: #fdfcfc;
 }
 
 .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 2rem;
   border-bottom: 1px solid #646262;
   padding-bottom: 1rem;
@@ -95,7 +102,7 @@ const removeWorkspace = (id) => {
   color: #646262;
 }
 
-section {
+.projects-section {
   margin-bottom: 3rem;
 }
 
@@ -106,21 +113,39 @@ h2 {
   padding-bottom: 0.5rem;
 }
 
-.actions {
-  display: flex;
+h3 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 1rem;
+}
+
+.project-card {
+  border: 1px solid #646262;
+  padding: 1rem;
+  cursor: pointer;
+  background-color: transparent;
+}
+
+.project-card:hover {
+  background-color: rgba(32, 29, 29, 0.05);
 }
 
 .btn {
   background: transparent;
   color: #201d1d;
   border: 1px solid #646262;
-  border-radius: 4px;
+  border-radius: 0;
   padding: 0.5rem 1rem;
   font-family: 'Berkeley Mono', monospace;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
 }
 
@@ -134,25 +159,72 @@ h2 {
   font-size: 0.85rem;
 }
 
-.workspace-table {
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100%;
-  border-collapse: collapse;
+  height: 100%;
+  background: rgba(32, 29, 29, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #fdfcfc;
   border: 1px solid #646262;
+  width: 800px;
+  max-width: 90vw;
+  padding: 1.5rem;
 }
 
-.workspace-table th,
-.workspace-table td {
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #646262;
+  padding-bottom: 0.5rem;
+}
+
+.modal-header h2 {
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+
+.modal-split {
+  display: flex;
+  gap: 2rem;
+}
+
+.modal-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+textarea {
+  flex: 1;
+  min-height: 150px;
+  background: transparent;
   border: 1px solid #646262;
-  padding: 0.75rem;
-  text-align: left;
+  color: #201d1d;
+  font-family: 'Berkeley Mono', monospace;
+  padding: 0.5rem;
+  resize: vertical;
 }
 
-.workspace-table th {
-  background: rgba(15,0,0,0.05);
+textarea:focus {
+  outline: 1px solid #201d1d;
 }
 
-.path {
-  color: #646262;
-  font-size: 0.9rem;
+.task-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
 }
 </style>
