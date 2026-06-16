@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 import os
@@ -46,12 +47,12 @@ def read_json(filename: str, default=None):
         with _lock(filename):
             path = _path(filename)
             if not path.exists():
-                return default
+                return copy.deepcopy(default)
             with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                return copy.deepcopy(json.load(f))
     except json.JSONDecodeError:
         logger.error("Corrupt JSON file: %s — returning default", filename)
-        return default
+        return copy.deepcopy(default)
 
 
 def write_json(filename: str, data) -> None:
@@ -74,10 +75,10 @@ def update_json(filename: str, default, mutator: Callable[[T], T]):
                 with open(path, "r", encoding="utf-8") as f:
                     data = json.load(f)
             else:
-                data = default
+                data = copy.deepcopy(default)
         except json.JSONDecodeError:
             logger.error("Corrupt JSON file: %s — resetting to default", filename)
-            data = default
+            data = copy.deepcopy(default)
         result = mutator(data)
         _atomic_write(path, data)
         return result
