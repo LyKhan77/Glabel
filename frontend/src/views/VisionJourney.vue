@@ -23,6 +23,46 @@
           <button class="btn primary-btn" @click="currentStep = 2">[>] Start Journey</button>
         </div>
       </div>
+
+      <div v-if="currentStep === 2" class="step-container">
+        <h2>2. Data Ingestion & Annotation</h2>
+        <div class="split-view">
+          <div class="left-pane">
+            <h3>Uploaded Images (10)</h3>
+            <ul class="mock-list">
+              <li>image_001.jpg</li>
+              <li>image_002.jpg</li>
+              <li>image_003.jpg</li>
+              <li>...</li>
+            </ul>
+          </div>
+          <div class="right-pane">
+            <h3>Label Assist (SAM3)</h3>
+            <p>Accelerate your labeling by using Segment Anything Model 3.</p>
+            <button class="btn" @click="autoAnnotate">[Auto-Annotate via SAM3]</button>
+          </div>
+        </div>
+        <div class="step-actions">
+          <button class="btn primary-btn" @click="currentStep = 3">[>] Next: Versioning</button>
+        </div>
+      </div>
+
+      <div v-if="currentStep === 3" class="step-container">
+        <h2>3. Dataset Versioning & Augmentation</h2>
+        <div class="form-group checkbox-group">
+          <label><input type="checkbox" checked /> Resize 640x640</label>
+          <label><input type="checkbox" /> Grayscale</label>
+          <label><input type="checkbox" /> Flip</label>
+          <label><input type="checkbox" /> Rotate</label>
+        </div>
+        <div class="form-group">
+          <label for="multiplier">Multiplier (e.g. 3x)</label>
+          <input type="text" id="multiplier" placeholder="3x" class="input-field" />
+        </div>
+        <div class="step-actions">
+          <button class="btn primary-btn" @click="currentStep = 4">[>] Create Version & Train</button>
+        </div>
+      </div>
     </main>
   </div>
 </template>
@@ -36,6 +76,10 @@ const currentStep = ref(1)
 
 const cancel = () => {
   router.push('/')
+}
+
+const autoAnnotate = () => {
+  alert('Mock: Annotating images...')
 }
 </script>
 
@@ -123,5 +167,42 @@ const cancel = () => {
 .primary-btn:hover {
   background: transparent;
   color: #201d1d;
+}
+
+.split-view {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.left-pane, .right-pane {
+  flex: 1;
+  border: 1px solid #646262;
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+.left-pane h3, .right-pane h3 {
+  margin-top: 0;
+  border-bottom: 1px dashed #646262;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.mock-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.mock-list li {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.checkbox-group {
+  flex-direction: row;
+  gap: 1.5rem;
+  align-items: center;
 }
 </style>
