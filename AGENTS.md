@@ -34,15 +34,59 @@ Open-source, **local-first** visual pipeline builder for Computer Vision (ComfyU
 
 ## Project Structure · `[KEEP UPDATED]`
 
-- `frontend/src/{views,components/{layout,nodes}}` — Vue app (dev :3000).
-- `backend/main.py` — app, lifespan, CORS, router mount, `/health`.
-- `backend/core/{config,storage}.py` — env config + atomic/locked JSON engine.
-- `backend/api/v1/projects.py` — thin REST routes.
-- `backend/services/projects.py` — CRUD logic via `update_json`.
-- `backend/schemas/project.py` — Pydantic models.
-- `backend/tests/` — pytest (`test_storage.py`, `test_projects_api.py`).
-- `docs/{plans,superpowers/specs}` — working artifacts (gitignored, NOT committed).
-- See README §Project Structure for the full tree.
+```
+glabel/
+├─ frontend/                      # Vue 3 + Vite + VueFlow app (dev :3000)
+│  ├─ index.html
+│  ├─ package.json                # deps: vue, vue-router, @vue-flow/core
+│  ├─ vite.config.js              # dev server port 3000
+│  ├─ public/
+│  │  └─ platypus-glabel.png
+│  └─ src/
+│     ├─ main.js                  # app entry
+│     ├─ App.vue                  # root component + router outlet
+│     ├─ components/
+│     │  ├─ layout/Sidebar.vue
+│     │  └─ nodes/                # VueFlow canvas nodes
+│     │     ├─ InputNode.vue
+│     │     ├─ InferenceNode.vue
+│     │     └─ OutputNode.vue
+│     └─ views/                   # routed pages
+│        ├─ Dashboard.vue
+│        ├─ Workspace.vue         # node canvas (VueFlow)
+│        ├─ ProjectView.vue
+│        ├─ ModelsView.vue
+│        ├─ PlaygroundsDashboard.vue
+│        ├─ VisionJourney.vue
+│        └─ SettingsView.vue
+├─ backend/                       # FastAPI app (run from project root, :8000)
+│  ├─ main.py                     # app, lifespan, CORS, router mount, /health
+│  ├─ requirements.txt
+│  ├─ core/
+│  │  ├─ config.py                # get_data_dir() (env GLABEL_DATA_DIR)
+│  │  └─ storage.py               # atomic + locked JSON read/write/update
+│  ├─ schemas/
+│  │  └─ project.py               # Pydantic models
+│  ├─ services/
+│  │  └─ projects.py              # CRUD logic via update_json
+│  ├─ api/v1/
+│  │  └─ projects.py              # thin REST routes (/api/v1/projects)
+│  └─ tests/
+│     ├─ test_storage.py
+│     └─ test_projects_api.py
+│     # (each backend/ subpackage also has an empty __init__.py — not shown)
+├─ docs/                          # gitignored — plans/specs/assets, NOT committed
+│  ├─ plans/                      # implementation plans (working artifacts)
+│  └─ superpowers/{specs,assets}/ # design specs + logos
+├─ glabel_data/                   # runtime JSON storage (gitignored, created on run)
+├─ AGENTS.md                      # this file
+├─ CLAUDE.md
+├─ DESIGN.md                      # frontend visual design reference
+├─ README.md                      # canonical project doc
+└─ .gitignore
+```
+
+**Layering (backend):** `api/v1` (thin HTTP routes) → `services` (business logic) → `core/storage` (generic persistence) → `schemas` (Pydantic shapes). See README §Project Structure for the same tree with deeper annotations.
 
 ## Perintah Project (Commands) · `[DO NOT CHANGE — canonical, verified]`
 
