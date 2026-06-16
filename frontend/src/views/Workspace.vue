@@ -6,8 +6,8 @@
       </button>
       <div class="toolbar-title">[Glabel] Workspace</div>
       <div class="toolbar-actions">
-        <button class="btn"><span class="icon">[Save]</span></button>
-        <button class="btn"><span class="icon">[Deploy]</span></button>
+        <button class="btn" @click="savePipeline"><span class="icon">[Save]</span></button>
+        <button class="btn" @click="deployPipeline"><span class="icon">[Deploy]</span></button>
       </div>
     </header>
     
@@ -15,14 +15,24 @@
       <aside class="node-palette">
         <div class="panel-header">Node Palette</div>
         <div class="palette-items">
-          <div class="palette-item">[+] Input</div>
-          <div class="palette-item">[+] Inference</div>
-          <div class="palette-item">[+] Output</div>
+          <div class="palette-item" draggable="true" @dragstart="onDragStart($event, 'customInput')">[+] Input</div>
+          <div class="palette-item" draggable="true" @dragstart="onDragStart($event, 'customInference')">[+] Inference</div>
+          <div class="palette-item" draggable="true" @dragstart="onDragStart($event, 'customOutput')">[+] Output</div>
         </div>
       </aside>
       
-      <main class="canvas-area">
-        <VueFlow :nodes="nodes" :edges="edges" fit-view-on-init />
+      <main class="canvas-area" @drop="onDrop" @dragover.prevent>
+        <VueFlow :nodes="nodes" :edges="edges" fit-view-on-init>
+          <template #node-customInput="props">
+            <InputNode :data="props.data" />
+          </template>
+          <template #node-customInference="props">
+            <InferenceNode :data="props.data" />
+          </template>
+          <template #node-customOutput="props">
+            <OutputNode :data="props.data" />
+          </template>
+        </VueFlow>
       </main>
       
       <aside class="properties-panel">
@@ -38,7 +48,11 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { VueFlow } from '@vue-flow/core'
+import { VueFlow, useVueFlow } from '@vue-flow/core'
+
+import InputNode from '../components/nodes/InputNode.vue'
+import InferenceNode from '../components/nodes/InferenceNode.vue'
+import OutputNode from '../components/nodes/OutputNode.vue'
 
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -50,15 +64,56 @@ const goHome = () => {
 }
 
 const nodes = ref([
-  { id: '1', type: 'input', label: 'Input Image', position: { x: 50, y: 150 } },
-  { id: '2', type: 'default', label: 'Inference', position: { x: 250, y: 150 } },
-  { id: '3', type: 'output', label: 'Output Result', position: { x: 450, y: 150 } }
+  { id: '1', type: 'customInput', data: { label: 'Input Image' }, position: { x: 50, y: 150 } },
+  { id: '2', type: 'customInference', data: { label: 'Inference' }, position: { x: 250, y: 150 } },
+  { id: '3', type: 'customOutput', data: { label: 'Output Result' }, position: { x: 450, y: 150 } }
 ])
 
 const edges = ref([
   { id: 'e1-2', source: '1', target: '2' },
   { id: 'e2-3', source: '2', target: '3' }
 ])
+
+const { project } = useVueFlow()
+let id = 4
+
+const onDragStart = (event, nodeType) => {
+  if (event.dataTransfer) {
+    event.dataTransfer.setData('application/vueflow', nodeType)
+    event.dataTransfer.effectAllowed = 'move'
+  }
+}
+
+const onDrop = (event) => {
+  const nodeType = event.dataTransfer?.getData('application/vueflow')
+
+  if (!nodeType) {
+    return
+  }
+
+  const position = project({
+    x: event.clientX,
+    y: event.clientY,
+  })
+
+  // Alternatively just use offsetX / offsetY
+  const newNode = {
+    id: `dndnode_${id++}`,
+    type: nodeType,
+    position: { x: event.offsetX, y: event.offsetY },
+    data: { label: `${nodeType} node` },
+  }
+
+  nodes.value.push(newNode)
+}
+
+const savePipeline = () => {
+  alert('Mock: Saving pipeline...')
+}
+
+const deployPipeline = () => {
+  alert('Mock: Exporting to Python script...')
+}
 </script>
 
 <style scoped>
