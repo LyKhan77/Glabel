@@ -93,4 +93,16 @@ Glabel menggunakan pendekatan **Launcher-to-Fullscreen**. Dashboard bertindak se
    - **Koneksi Auto-connect**: Memungkinkan *user* untuk menggunakan *shortcut* (misal: tekan `Shift` sambil men-drop Node baru) untuk menyambungkan Node secara otomatis ke Node terdekat/sebelumnya. Hal ini mempercepat pembuatan *linear pipeline*.
 4. **Real-time Tuning**: Parameter diubah di Properties Panel (Kanan), *output* video/gambar dan metrik latensi pada Node akan ter-update secara *real-time*.
 
+## 9. Advanced Computer Vision Features (Expert Additions)
+Sebagai platform skala *Enterprise/Expert*, Glabel dilengkapi dengan fitur validasi dan optimasi tingkat lanjut yang menjadi standar industri:
+
+1. **Interactive ROI & Zone Definition**:
+   *User* dapat menggambar Polygon (Area) atau Garis (*Line Crossing*) secara langsung pada *Output Node Preview* untuk membatasi area deteksi. Node ini akan secara cerdas memfilter objek yang hanya berada di dalam zona tersebut (menggunakan `supervision.PolygonZone`).
+2. **DAG Execution Optimization & Node Caching**:
+   Setiap *output* dari sebuah Node akan di-*cache* sementara (di RAM/VRAM). Jika *user* hanya menggeser *slider* *Confidence Threshold* di Logic Node, sistem tidak akan melakukan inferensi ulang pada *YOLO Node* sebelumnya. Hal ini membuat latensi *tuning* turun menjadi 0ms.
+3. **Batch Evaluation & Metrics Aggregation**:
+   Selain memproses satu video secara *real-time*, pengguna dapat menghubungkan folder (berisi ratusan gambar) ke *pipeline*, lalu melihat agregat akurasi, grafik *confusion matrix*, dan daftar *False Positives* (jika menggunakan gambar yang sudah memiliki *ground truth* XML/YOLO txt).
+4. **Code / Pipeline Export**:
+   Setelah selesai meracik kanvas, *user* dapat mengeklik tombol **"Export to Python"**. Glabel akan men-*generate* skrip Python utuh yang mereplikasi *pipeline* tersebut, siap untuk di-*deploy* di server produksi tanpa UI (sebagai *headless runner* atau *Docker container*).
+
 *(Catatan: Desain antarmuka (UI) final akan mengacu pada kaidah premium dan fungsional seperti yang direkomendasikan pada skill `ui-ux-pro-max` / `impeccable`)*
