@@ -38,11 +38,12 @@ Sistem memproses antrean (*queue*) node sebagai *Directed Acyclic Graph* (DAG).
    Mampu memproses *batch* direktori secara otomatis untuk menghasilkan matriks evaluasi (mAP, F1-Score, Confusion Matrix, False Positives).
 3. **Code / Pipeline Export**:
    Backend mampu mengompilasi representasi JSON (DAG) menjadi skrip Python murni (`.py`) yang *headless*, siap untuk dijalankan di *production / docker container*.
-4. **Active Learning (Hard Negative Mining)**:
-   Saat terjadi kegagalan deteksi, *frame* akan diekstrak dan masuk ke siklus *Active Learning*. Mekanisme:
-   - **Otomatis**: Jika sistem mendeteksi ambiguitas (*confidence score* 15%-40%).
-   - **Manual**: Via trigger WebSocket dari *user*.
-   *Frame* ini kemudian dianotasi secara otomatis menggunakan model *zero-shot* terkuat (misal SAM2) dan disimpan ke direktori `Dataset/Flagged` berformat YOLO txt untuk *re-training*.
+4. **End-to-End Training Pipeline (Vision Solution)**:
+   Backend bertindak sebagai *Local MLOps Engine* yang mencakup:
+   - **Data Ingestion & Label Assist**: Menyediakan endpoint untuk *scanning* direktori dan memuat model zero-shot (SAM3) secara *on-the-fly* untuk menghasilkan anotasi otomatis berdasarkan klik (*prompt*) pengguna.
+   - **Dataset Augmentation Engine**: Menerapkan *Pre-Processing* dan *Augmentation Pipeline* lokal sebelum *training*, termasuk ekspansi *dataset* (*image multiplier*).
+   - **Local Model Training Loop**: Menginisiasi proses *training* (misal menggunakan modul `ultralytics` secara *background process* pada GPU) dan men-*stream* matriks *Loss* / mAP via WebSockets agar UI tidak *blocking*.
+   - **Playground Integration**: Model `.pt` atau `.onnx` yang baru selesai dilatih otomatis diindeks dan dapat langsung dipanggil ke *Inference Node* di kanvas.
 
 ## 7. Deployment Strategy
 Menggunakan arsitektur **Isolated Virtual Environment (`.venv`)**. Skrip `install.bat` / `install.sh` akan secara mandiri mendeteksi OS (*Windows/Linux/Mac*) dan mengunduh konfigurasi PyTorch yang sesuai tanpa interferensi dependensi *host*.

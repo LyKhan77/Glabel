@@ -58,6 +58,10 @@ Glabel menggunakan pendekatan **Launcher-to-Fullscreen**. Dashboard bertindak se
 - **Output Nodes**: Menampilkan *Metrics Panel* dan hasil visualisasi inferensi secara langsung **di dalam badan node tersebut** (*In-Canvas Preview*), alih-alih menggunakan jendela melayang yang terpisah.
 - **Interactive ROI**: Pengguna dapat menggambar Polygon/Garis di atas video *preview* yang ada di dalam Node untuk membatasi area analitik.
 
-### 5.3. Vision Solution (End-to-End Mode)
-- **Data Relinking Alert**: Jika file sumber berpindah (*broken path*), UI akan memunculkan modal peringatan dan tombol "Relink Dataset Folder".
-- **Active Learning Feedback**: Menyediakan pintasan (*shortcut* seperti tombol Spasi/F) saat melihat *live preview* untuk memicu instruksi *Flagging* ke backend secara manual.
+### 5.3. Vision Solution (End-to-End Local Studio)
+Berfungsi sebagai asisten komprehensif mulai dari anotasi hingga *training*:
+1. **Task Definition Wizard**: Membuka Vision Solution menampilkan antarmuka *wizard* di mana pengguna memasukkan *Task Type* (misal: Object Detection, Segmentation) atau *Use Case*. Aplikasi akan merekomendasikan *Workflow Pipeline*.
+2. **Data Ingestion & Label Assist**: Pengguna mengunggah direktori *dataset* (gambar/video). Disediakan antarmuka **Image Processing & Annotation** yang dilengkapi *Label Assist* (didukung SAM3 / Pre-trained YOLO) untuk anotasi otomatis sekali-klik.
+3. **Dataset Versioning**: Sebelum *training*, pengguna diarahkan ke layar *Dataset Versioning* untuk menentukan opsi *Pre-Processing* (Resize, Grayscale) dan *Augmentation* (Rotasi, Flip, Multiplier image factor).
+4. **Local Training Dashboard**: UI menampilkan grafik *Loss* dan mAP secara *real-time* saat *Local Training* berlangsung sesuai *Task Type*.
+5. **Start Journey (Create Workspace)**: Setelah proses *training* selesai, model baru langsung dimasukkan ke dalam *Inference Playground* (Workspace Canvas) untuk diuji secara *live*.
