@@ -82,8 +82,8 @@ const submitNewProject = () => {
   max-width: 1200px;
   margin: 0 auto;
   font-family: 'Berkeley Mono', monospace;
-  color: #201d1d;
-  background-color: #fdfcfc;
+  color: var(--text-color, #201d1d);
+  background-color: var(--bg-color, #fdfcfc);
 }
 
 .header {
@@ -91,7 +91,7 @@ const submitNewProject = () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
-  border-bottom: 1px solid #646262;
+  border-bottom: 1px solid var(--border-color, #646262);
   padding-bottom: 1rem;
 }
 
@@ -102,7 +102,7 @@ const submitNewProject = () => {
 
 .header p {
   margin: 0.5rem 0 0 0;
-  color: #646262;
+  color: var(--border-color, #646262);
 }
 
 .projects-section {
@@ -112,7 +112,7 @@ const submitNewProject = () => {
 h2 {
   font-size: 1.2rem;
   margin-bottom: 1rem;
-  border-bottom: 1px dashed #646262;
+  border-bottom: 1px dashed var(--border-color, #646262);
   padding-bottom: 0.5rem;
 }
 
@@ -128,7 +128,7 @@ h3 {
 }
 
 .project-card {
-  border: 1px solid #646262;
+  border: 1px solid var(--border-color, #646262);
   padding: 1rem;
   cursor: pointer;
   background-color: transparent;
@@ -140,8 +140,8 @@ h3 {
 
 .btn {
   background: transparent;
-  color: #201d1d;
-  border: 1px solid #646262;
+  color: var(--text-color, #201d1d);
+  border: 1px solid var(--border-color, #646262);
   border-radius: 0;
   padding: 0.5rem 1rem;
   font-family: 'Berkeley Mono', monospace;
@@ -153,8 +153,8 @@ h3 {
 }
 
 .btn:hover {
-  background: #201d1d;
-  color: #fdfcfc;
+  background: var(--text-color, #201d1d);
+  color: var(--bg-color, #fdfcfc);
 }
 
 .sm-btn {
@@ -176,8 +176,8 @@ h3 {
 }
 
 .modal-content {
-  background: #fdfcfc;
-  border: 1px solid #646262;
+  background: var(--bg-color, #fdfcfc);
+  border: 1px solid var(--border-color, #646262);
   width: 800px;
   max-width: 90vw;
   padding: 1.5rem;
@@ -188,7 +188,7 @@ h3 {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1.5rem;
-  border-bottom: 1px solid #646262;
+  border-bottom: 1px solid var(--border-color, #646262);
   padding-bottom: 0.5rem;
 }
 
@@ -214,15 +214,15 @@ textarea {
   flex: 1;
   min-height: 150px;
   background: transparent;
-  border: 1px solid #646262;
-  color: #201d1d;
+  border: 1px solid var(--border-color, #646262);
+  color: var(--text-color, #201d1d);
   font-family: 'Berkeley Mono', monospace;
   padding: 0.5rem;
   resize: vertical;
 }
 
 textarea:focus {
-  outline: 1px solid #201d1d;
+  outline: 1px solid var(--text-color, #201d1d);
 }
 
 .task-grid {

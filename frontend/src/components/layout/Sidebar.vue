@@ -2,14 +2,16 @@
 <template>
   <aside class="sidebar">
     <div class="logo">
-      <img src="/glabel-logo-transparent.png" alt="Glabel" style="height: 40px; filter: grayscale(100%) invert(var(--img-invert, 0));" />
+      <img src="/platypus-glabel.png" alt="Glabel" style="height: 40px; filter: grayscale(100%) invert(var(--img-invert, 0));" />
     </div>
     <nav class="nav-links">
       <router-link to="/" class="nav-item">Open Vision</router-link>
       <router-link to="/playgrounds" class="nav-item">Playgrounds</router-link>
       <router-link to="/models" class="nav-item">Models</router-link>
       <router-link to="/settings" class="nav-item">Settings</router-link>
-      <button @click="toggleTheme" class="nav-item theme-btn">[Toggle Theme]</button>
+      <button @click="toggleTheme" class="nav-item theme-btn">
+        {{ isDark ? '[☼] Light Mode' : '[☾] Dark Mode' }}
+      </button>
     </nav>
   </aside>
 </template>

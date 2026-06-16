@@ -1,3 +1,15 @@
+<script setup>
+import { ref } from 'vue'
+
+const sysInfo = ref(null)
+
+const detectSystem = () => {
+  // Mock detection
+  sysInfo.value = "Detected: Windows 11 | GPU: NVIDIA RTX 4090 (CUDA Available) | CPU: AMD Ryzen 9"
+  alert("System detected successfully. Once the backend is implemented, this will fetch real hardware information via WebSocket/API.")
+}
+</script>
+
 <template>
   <div class="settings-container">
     <header class="header">
@@ -8,12 +20,16 @@
     <main class="main-content">
       <div class="settings-section">
         <h3>Hardware Target</h3>
-        <select class="austere-input">
-          <option>Auto (Detect)</option>
-          <option>CPU</option>
-          <option>GPU (CUDA)</option>
-          <option>MPS (Apple Silicon)</option>
-        </select>
+        <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 0.5rem;">
+          <select class="austere-input" style="flex: 1; margin-bottom: 0;">
+            <option>Auto (Detect)</option>
+            <option>CPU</option>
+            <option>GPU (CUDA)</option>
+            <option>MPS (Apple Silicon)</option>
+          </select>
+          <button class="btn" @click="detectSystem">[Detect System]</button>
+        </div>
+        <p v-if="sysInfo" class="desc sys-info">{{ sysInfo }}</p>
       </div>
 
       <div class="settings-section">
@@ -77,6 +93,16 @@
 }
 .austere-input:focus {
   outline: 1px solid var(--text-color, #201d1d);
+}
+
+select.austere-input option {
+  background-color: var(--bg-color, #fdfcfc);
+  color: var(--text-color, #201d1d);
+}
+
+.sys-info {
+  margin-top: 0.5rem;
+  color: #4caf50;
 }
 
 .btn {

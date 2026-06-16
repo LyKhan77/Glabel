@@ -8,7 +8,17 @@ const activeTab = ref('dataset') // 'dataset', 'versions', 'train'
 
 // Dataset state
 const datasetState = ref('unannotated') // 'unannotated', 'annotated'
+const fpsSlider = ref(2)
+const isDragging = ref(false)
 const showUploadModal = ref(false)
+
+const onDragOver = (e) => { e.preventDefault(); isDragging.value = true }
+const onDragLeave = (e) => { e.preventDefault(); isDragging.value = false }
+const onDrop = (e) => {
+  e.preventDefault(); 
+  isDragging.value = false;
+  mockUpload()
+}
 
 const images = ref([
   { id: 1, annotated: false },
@@ -205,13 +215,25 @@ const testInPlayground = () => {
           <button class="nav-btn" @click="showUploadModal = false">[x] Close</button>
         </div>
         <div class="modal-body">
-          <div class="upload-options">
-            <button class="action-btn" style="width: 100%; margin-bottom: 1rem;">[Choose Image Files]</button>
-            <button class="action-btn" style="width: 100%;">[Choose Video File]</button>
+          <div 
+            class="drag-zone" 
+            :class="{ 'drag-active': isDragging }"
+            @dragover="onDragOver"
+            @dragleave="onDragLeave"
+            @drop="onDrop"
+          >
+            <p style="margin: 0;">Drag and drop files/folders here<br>or</p>
+            <div class="upload-options" style="margin-top: 1rem; display: flex; gap: 1rem; justify-content: center;">
+              <button class="action-btn">[Choose Image Files]</button>
+              <button class="action-btn">[Choose Video File]</button>
+            </div>
           </div>
-          <div style="margin-top: 1rem;">
-            <label style="display: block; margin-bottom: 0.5rem;">Extract Frames per second (FPS)</label>
-            <input type="number" placeholder="e.g. 2" class="number-input" style="width: 100%; display: block; box-sizing: border-box;" />
+          <div style="margin-top: 1.5rem;">
+            <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span>Extract Frames per second (FPS)</span>
+              <strong>{{ fpsSlider }} FPS</strong>
+            </label>
+            <input type="range" v-model="fpsSlider" min="1" max="60" class="slider" style="width: 100%; display: block; box-sizing: border-box;" />
           </div>
           <div style="margin-top: 2rem; text-align: right;">
             <button class="action-btn" @click="mockUpload">[Upload & Process]</button>
@@ -442,5 +464,36 @@ button:disabled {
 
 .modal-header h3 {
   margin: 0;
+}
+
+.drag-zone {
+  border: 2px dashed var(--border-color, #646262);
+  padding: 2rem;
+  text-align: center;
+  transition: all 0.3s ease;
+  margin-bottom: 1rem;
+}
+
+.drag-zone.drag-active {
+  background: var(--hover-bg, rgba(15,0,0,0.05));
+  border-color: var(--text-color, #201d1d);
+}
+
+.slider {
+  -webkit-appearance: none;
+  background: transparent;
+}
+.slider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 2px;
+  background: var(--border-color, #646262);
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 16px;
+  width: 8px;
+  background: var(--text-color, #201d1d);
+  margin-top: -7px;
+  cursor: ew-resize;
 }
 </style>
