@@ -10,6 +10,7 @@ __pycache__/
 *$py.class
 venv/
 env/
+.venv/
 .env
 glabel_data/
 
