@@ -12,6 +12,7 @@ venv/
 env/
 .venv/
 .env
+.dev/
 glabel_data/
 
 # IDE and OS

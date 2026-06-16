@@ -82,6 +82,7 @@ glabel/
 ├─ docs/                          # gitignored — plans/specs/assets, NOT committed
 │  ├─ plans/                      # implementation plans (working artifacts)
 │  └─ superpowers/{specs,assets}/ # design specs + logos
+├─ scripts/                       # local dev start/stop helpers
 ├─ glabel_data/                   # runtime JSON storage (gitignored, created on run)
 ├─ AGENTS.md                      # this file
 ├─ CLAUDE.md
@@ -97,6 +98,7 @@ glabel/
 <!-- Do NOT change these without re-verifying. See README §Perintah Project. -->
 Frontend: `cd frontend && npm install && npm run dev` (Vite → :3000).
 Backend (run from project root): `python -m venv .venv`, `.\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt`, `.\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload` (:8000), `.\.venv\Scripts\python.exe -m pytest backend/tests/ -v`.
+Full local app: `.\scripts\start-dev.ps1` to start backend + frontend, `.\scripts\stop-dev.ps1` to stop them.
 
 ## Coding Conventions · `[KEEP UPDATED]`
 
@@ -122,6 +124,7 @@ Backend (run from project root): `python -m venv .venv`, `.\.venv\Scripts\python
 - **2026-06-16** — Frontend: Vue 3 + VueFlow canvas + app shell (prior work).
 - **2026-06-17** — Added README.md; expanded AGENTS.md project sections (this block).
 - **2026-06-17** — Added `.venv` workflow, OpenCV-backed dataset upload/video frame extraction APIs, dataset versions, and frontend API client wiring.
+- **2026-06-17** — Added Windows PowerShell dev scripts for starting/stopping backend + frontend together.
 
 **Next:** WebSocket layer, real SAM/YOLO annotation output, image serving, Ultralytics training lifecycle.
 

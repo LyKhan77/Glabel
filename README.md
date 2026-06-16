@@ -78,6 +78,7 @@ glabel/
 │  ├─ tests/                  # pytest backend API/storage tests
 │  └─ requirements.txt
 ├─ docs/            # plans + specs (gitignored — NOT committed)
+├─ scripts/         # local dev start/stop helpers
 ├─ DESIGN.md                  # frontend visual design reference
 ├─ AGENTS.md                  # agent + project operating manual
 └─ README.md                  # this file
@@ -102,6 +103,13 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
 .\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload    # → http://127.0.0.1:8000
 .\.venv\Scripts\python.exe -m pytest backend/tests/ -v             # 14 tests, expect all pass
+```
+
+**Full local app** (run from the **project root**, Windows PowerShell):
+```powershell
+.\scripts\start-dev.ps1              # starts backend + frontend, installs backend deps
+.\scripts\start-dev.ps1 -SkipInstall # faster restart when deps are already installed
+.\scripts\stop-dev.ps1               # stops backend + frontend started by the script
 ```
 
 > Run the backend from the project root (not from inside `backend/`): the app is a package (`uvicorn backend.main:app`), so imports like `from backend.core.storage import ...` resolve correctly.
@@ -153,6 +161,7 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 - **2026-06-16** — Frontend: Vue 3 + VueFlow canvas + app shell (built earlier, prior work).
 - **2026-06-17** — Added `README.md` and expanded `AGENTS.md` project sections.
 - **2026-06-17** — Added `.venv` workflow, OpenCV-backed dataset upload/video frame extraction APIs, dataset version APIs, and frontend API integration.
+- **2026-06-17** — Added Windows PowerShell dev scripts for starting/stopping backend + frontend together.
 
 **In development / next:**
 - WebSocket layer (training progress, playground inference).
