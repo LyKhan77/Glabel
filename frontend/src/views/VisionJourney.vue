@@ -63,16 +63,50 @@
           <button class="btn primary-btn" @click="currentStep = 4">[>] Create Version & Train</button>
         </div>
       </div>
+
+      <div v-if="currentStep === 4" class="step-container">
+        <h2>4. Local Training Dashboard</h2>
+        <div class="training-ui">
+          <p>Status: {{ progress < 100 ? 'Training Model...' : 'Training Complete' }}</p>
+          <div class="progress-bar-container">
+            <div class="progress-bar" :style="{ width: progress + '%' }"></div>
+          </div>
+          <div class="metrics">
+            <span>Progress: {{ progress }}%</span>
+            <span>mAP: {{ mapScore.toFixed(2) }}</span>
+          </div>
+        </div>
+        <div class="step-actions" v-if="progress >= 100">
+          <button class="btn primary-btn" @click="openWorkspace">[🚀] Open in Playground</button>
+        </div>
+      </div>
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const currentStep = ref(1)
+
+const progress = ref(0)
+const mapScore = ref(0.0)
+
+watch(currentStep, (newStep) => {
+  if (newStep === 4) {
+    const interval = setInterval(() => {
+      if (progress.value < 100) {
+        progress.value += 10
+        mapScore.value += Math.random() * 0.1
+        if (mapScore.value > 0.95) mapScore.value = 0.95
+      } else {
+        clearInterval(interval)
+      }
+    }, 500)
+  }
+})
 
 const cancel = () => {
   router.push('/')
@@ -80,6 +114,10 @@ const cancel = () => {
 
 const autoAnnotate = () => {
   alert('Mock: Annotating images...')
+}
+
+const openWorkspace = () => {
+  router.push('/workspace')
 }
 </script>
 
@@ -204,5 +242,30 @@ const autoAnnotate = () => {
   flex-direction: row;
   gap: 1.5rem;
   align-items: center;
+}
+
+.training-ui {
+  border: 1px solid #646262;
+  padding: 1.5rem;
+  border-radius: 4px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 20px;
+  border: 1px solid #646262;
+  margin: 1rem 0;
+}
+
+.progress-bar {
+  height: 100%;
+  background: #201d1d;
+  transition: width 0.3s ease;
+}
+
+.metrics {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Berkeley Mono', monospace;
 }
 </style>
