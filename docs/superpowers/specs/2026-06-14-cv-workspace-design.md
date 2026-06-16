@@ -44,9 +44,14 @@ Saat aplikasi dibuka, pengguna akan disambut oleh sebuah **Dashboard bergaya Ter
 - **State**: *Stateless*.
 
 ### Mode 2: Vision Solution / Solution Blueprints (End-to-End Mode)
-- **Kondisi Awal**: Sistem memuat konfigurasi Pipeline dari file JSON (*Template-Driven*).
-- **Penyimpanan Lokal (Workspace & Asset Management)**: File `.glabel` murni menyimpan arsitektur Node dan **Absolute Path** ke folder gambar/video di hardisk pengguna. Aplikasi **tidak** merubah gambar menjadi *Base64* untuk menghemat ukuran file dan memori RAM. Hal ini menjamin file JSON tetap berukuran kilobyte.
-- **Workflow**: Load Blueprint -> Upload Sampel -> Evaluasi Model -> Cek *Metrics Panel* -> Jika ada *failure cases*, lakukan *Flagging* -> *Send to Annotation*.
+- **Kondisi Awal (Pre-built Templates)**: Sistem memuat konfigurasi Pipeline dari file JSON (*Template-Driven*). Template Blueprint (misal: *PPE Detection*, *OCR*) di-*bundle* secara statis (100% *offline*) di dalam instalasi aplikasi untuk menjamin privasi data tanpa perlu koneksi ke *cloud*.
+- **Penyimpanan Lokal & Data Relinking**: File `.glabel` murni menyimpan arsitektur Node dan **Absolute Path** ke folder gambar/video di hardisk pengguna. Jika folder dataset dipindahkan, sistem akan mendeteksi path yang *broken* dan memunculkan fitur **"Relink Dataset Folder"**. Aplikasi **tidak** merubah gambar menjadi *Base64* untuk menghemat ukuran file dan memori RAM.
+- **Workflow & Active Learning (Hard Negative Mining)**: Load Blueprint ➔ Hubungkan Dataset ➔ Evaluasi Model ➔ Cek *Metrics Panel*.
+  - Jika ada *failure cases* (kesalahan deteksi), sistem masuk ke **Fase Active Learning**.
+  - **Mekanisme Flagging (Hybrid)**: 
+    1. **Otomatis**: Sistem akan men-*flag* dan mengekstrak *frame* yang memiliki *confidence score* meragukan (misal: 15% - 40%).
+    2. **Manual**: *User* dapat menekan *shortcut* (misal: Spasi/F) saat melihat *frame* yang salah pada *live preview*.
+  - *Frame* yang ter-*flag* akan dianotasi ulang (*auto-annotate*) menggunakan model *zero-shot* terkuat (seperti SAM2) dan disimpan ke folder `Dataset/Flagged` beserta file `.txt` YOLO-nya, siap untuk *re-training* model.
 
 ## 6. Deployment & Environment Strategy
 Untuk kompatibilitas maksimal di berbagai perangkat (Windows/Linux/Mac), Backend Glabel akan menggunakan arsitektur **Isolated Virtual Environment (`.venv`)** yang dibangun menggunakan `install.bat` (Windows) atau `install.sh` (Unix). Skrip instalasi cerdas ini akan mendeteksi OS pengguna dan mengunduh index PyTorch yang sesuai.
