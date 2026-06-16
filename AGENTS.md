@@ -1,6 +1,88 @@
-# Project Overview
+# Glabel — Agent & Project Operating Manual
 
-...
+<!-- LIVING DOCUMENT: Sections marked `[KEEP UPDATED]` are editable and MUST be -->
+<!-- kept accurate as the codebase changes. See "Documentation Maintenance".    -->
+<!-- The RULES section and the behavioral guidelines below the `====` dividers   -->
+<!-- are generic agent rules and should not be edited.                           -->
+
+README.md is the canonical, detailed project doc. AGENTS.md orients an agent fast — most sections below summarize README and link to it.
+
+## Project Overview · `[KEEP UPDATED]`
+
+Open-source, **local-first** visual pipeline builder for Computer Vision (ComfyUI/Jupyter-style). Frontend = Vue 3 + VueFlow node canvas; Backend = Python FastAPI with flat-JSON storage; planned ML engine = PyTorch + Ultralytics (YOLOv11, RT-DETR) with WebSocket progress streaming. Runs entirely on localhost — no SQL DB, no Docker required. See README §Project Overview for detail.
+
+## Project Guidelines · `[KEEP UPDATED]`
+
+- **Local-first philosophy:** no remote services, no SQL database. State = flat JSON files under `./glabel_data`.
+- **Simplicity & surgical changes** are mandatory (see RULES + behavioral guidelines below).
+- **Plan before code:** brainstorm → spec → plan → execute. Save plans to `docs/temp_docs/plans/` (never commit them).
+- **Atomic persistence:** all state mutations go through `storage.update_json` — never read+manual-write.
+- **Commit per logical change**; roll back via git history.
+- **Keep docs in sync:** update README + AGENTS "Current State" as part of every change.
+
+## Tech Stack · `[KEEP UPDATED]`
+
+- Frontend: Vue 3, Vite 4, `@vue-flow/core`, `vue-router` (Node v22).
+- Backend: FastAPI, Uvicorn, Pydantic v2, `filelock`, pytest + httpx (Python 3.10+).
+- Storage: flat JSON files (local `./glabel_data`, gitignored).
+- Planned: PyTorch, `ultralytics` (YOLOv11, RT-DETR), WebSockets.
+
+## Key Features · `[KEEP UPDATED]`
+
+- Done: VueFlow node canvas (input/inference/output), app shell (Dashboard, Models, Playgrounds, Project, Settings, Vision Journey, Workspace), atomic JSON storage, Projects CRUD API, `/health`.
+- Planned: frontend↔backend API integration, WebSocket streaming, Ultralytics training lifecycle, dataset upload + auto-annotation, Playground DAG execution.
+
+## Project Structure · `[KEEP UPDATED]`
+
+- `frontend/src/{views,components/{layout,nodes}}` — Vue app (dev :3000).
+- `backend/main.py` — app, lifespan, CORS, router mount, `/health`.
+- `backend/core/{config,storage}.py` — env config + atomic/locked JSON engine.
+- `backend/api/v1/projects.py` — thin REST routes.
+- `backend/services/projects.py` — CRUD logic via `update_json`.
+- `backend/schemas/project.py` — Pydantic models.
+- `backend/tests/` — pytest (`test_storage.py`, `test_projects_api.py`).
+- `docs/temp_docs/{plans,superpowers/specs}` — working artifacts (gitignored, NOT committed).
+- See README §Project Structure for the full tree.
+
+## Perintah Project (Commands) · `[DO NOT CHANGE — canonical, verified]`
+
+<!-- Do NOT change these without re-verifying. See README §Perintah Project. -->
+Frontend: `cd frontend && npm install && npm run dev` (Vite → :3000).
+Backend (run from project root): `python -m pip install -r backend/requirements.txt`, `python -m uvicorn backend.main:app --reload` (:8000), `python -m pytest backend/tests/ -v`.
+
+## Coding Conventions · `[KEEP UPDATED]`
+
+- Layering: `api/v1` (thin routes) → `services` (logic) → `core/storage` (persistence) → `schemas`. No business logic in routes.
+- Backend is a package: run `uvicorn backend.main:app` from project root; absolute imports `from backend.core...`.
+- Mutate state only via `storage.update_json` (atomic read-modify-write under one lock).
+- TDD: failing test → implement → green (pytest + httpx TestClient).
+- Config via env at call time (`GLABEL_DATA_DIR`); tests isolate with `monkeypatch` + `tmp_path`.
+
+## Workflow · `[KEEP UPDATED]`
+
+1. Brainstorm (superpowers:brainstorming) → spec in `docs/temp_docs/superpowers/specs/`.
+2. Plan (superpowers:writing-plans) → `docs/temp_docs/plans/` (NOT committed).
+3. Execute task-by-task (superpowers:subagent-driven-development): implementer → spec review → quality review → commit.
+4. Finish branch (superpowers:finishing-a-development-branch) → push + PR.
+5. Update README + this file's Current State.
+
+## Current State (Changelog) · `[KEEP UPDATED]`
+
+**Status:** Frontend complete. Backend scaffolded (atomic JSON storage + Projects CRUD). Frontend↔backend integration not yet wired. Active branch `backend/implementation-v1` (pushed, PR pending).
+
+- **2026-06-16** — Backend scaffold: FastAPI package, atomic/locked `storage.py`, Projects CRUD, `/health`, CORS (`:3000`), `lifespan`. 9 tests green.
+- **2026-06-16** — Frontend: Vue 3 + VueFlow canvas + app shell (prior work).
+- **2026-06-17** — Added README.md; expanded AGENTS.md project sections (this block).
+
+**Next:** frontend API client, WebSocket layer, Ultralytics training lifecycle, dataset/auto-annotation.
+
+## Documentation Maintenance
+
+- Sections marked `[KEEP UPDATED]` are living — edit them when the codebase changes.
+- `[DO NOT CHANGE]` command list is canonical; only change after verifying it runs.
+- README.md is the detailed canonical doc; AGENTS.md is the fast agent orientation.
+- Changelog entries are dated `YYYY-MM-DD`, append-only.
+- Do **not** commit `docs/temp_docs/`.
 
 ===========================
 
