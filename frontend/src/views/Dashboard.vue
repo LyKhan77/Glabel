@@ -27,6 +27,9 @@
           <h2>Create New Project</h2>
           <button class="btn sm-btn" @click="showModal = false">[x] Close</button>
         </div>
+        <div style="margin-bottom: 1rem;">
+          <input type="text" placeholder="Workspace Name" class="austere-input" />
+        </div>
         <div class="modal-split">
           <!-- Left Column -->
           <div class="modal-col">
@@ -226,5 +229,18 @@ textarea:focus {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.5rem;
+}
+
+.austere-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border-color, #646262);
+  background: transparent;
+  color: var(--text-color, #201d1d);
+  padding: 0.5rem;
+  font-family: inherit;
+}
+.austere-input:focus {
+  outline: 1px solid var(--text-color, #201d1d);
 }
 </style>

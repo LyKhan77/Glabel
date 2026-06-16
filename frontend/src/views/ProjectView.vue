@@ -8,6 +8,7 @@ const activeTab = ref('dataset') // 'dataset', 'versions', 'train'
 
 // Dataset state
 const datasetState = ref('unannotated') // 'unannotated', 'annotated'
+const showUploadModal = ref(false)
 
 const images = ref([
   { id: 1, annotated: false },
@@ -27,6 +28,14 @@ const autoAnnotateAll = () => {
   images.value.forEach(img => {
     img.annotated = true
   })
+}
+
+const mockUpload = () => {
+  const newId = images.value.length ? Math.max(...images.value.map(i => i.id)) + 1 : 1
+  images.value.push({ id: newId, annotated: false })
+  images.value.push({ id: newId + 1, annotated: false })
+  showUploadModal.value = false
+  alert('Mock: Media uploaded and processed!')
 }
 
 // Versions state
@@ -100,7 +109,7 @@ const testInPlayground = () => {
             <button class="action-btn" v-if="datasetState === 'unannotated'" @click="autoAnnotateAll">
               [Auto-Annotate All (SAM3)]
             </button>
-            <button class="action-btn">[Upload Media]</button>
+            <button class="action-btn" @click="showUploadModal = true">[Upload Media]</button>
           </div>
         </div>
 
@@ -187,6 +196,29 @@ const testInPlayground = () => {
         </div>
       </div>
     </main>
+
+    <!-- Upload Media Modal -->
+    <div v-if="showUploadModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Upload Media</h3>
+          <button class="nav-btn" @click="showUploadModal = false">[x] Close</button>
+        </div>
+        <div class="modal-body">
+          <div class="upload-options">
+            <button class="action-btn" style="width: 100%; margin-bottom: 1rem;">[Choose Image Files]</button>
+            <button class="action-btn" style="width: 100%;">[Choose Video File]</button>
+          </div>
+          <div style="margin-top: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem;">Extract Frames per second (FPS)</label>
+            <input type="number" placeholder="e.g. 2" class="number-input" style="width: 100%; display: block; box-sizing: border-box;" />
+          </div>
+          <div style="margin-top: 2rem; text-align: right;">
+            <button class="action-btn" @click="mockUpload">[Upload & Process]</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -374,7 +406,41 @@ button:disabled {
 
 .progress-fill {
   height: 100%;
-  background: #201d1d;
+  background: var(--text-color, #201d1d);
   transition: width 0.3s;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(32, 29, 29, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--bg-color, #fdfcfc);
+  border: 1px solid var(--border-color, #646262);
+  width: 500px;
+  max-width: 90vw;
+  padding: 1.5rem;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color, #646262);
+  padding-bottom: 0.5rem;
+}
+
+.modal-header h3 {
+  margin: 0;
 }
 </style>
