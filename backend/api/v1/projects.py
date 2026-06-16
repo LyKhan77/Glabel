@@ -16,6 +16,14 @@ def create_project(payload: ProjectCreate):
     return svc.create_project(payload)
 
 
+@router.get("/{project_id}", response_model=ProjectResponse)
+def get_project(project_id: str):
+    project = svc.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
 @router.patch("/{project_id}", response_model=ProjectResponse)
 def update_project(project_id: str, payload: ProjectUpdate):
     project = svc.update_project(project_id, payload)

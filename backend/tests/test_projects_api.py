@@ -27,7 +27,19 @@ def test_create_list_update_delete(client):
     assert client.get("/api/v1/projects/").json() == []
 
 
+def test_get_project_detail(client):
+    created = client.post("/api/v1/projects/", json={"name": "Detail", "description": "d"})
+    pid = created.json()["id"]
+
+    detail = client.get(f"/api/v1/projects/{pid}")
+
+    assert detail.status_code == 200
+    assert detail.json()["id"] == pid
+    assert detail.json()["name"] == "Detail"
+
+
 def test_missing_project_returns_404(client):
+    assert client.get("/api/v1/projects/nope").status_code == 404
     assert client.patch("/api/v1/projects/nope", json={"name": "x"}).status_code == 404
     assert client.delete("/api/v1/projects/nope").status_code == 404
 

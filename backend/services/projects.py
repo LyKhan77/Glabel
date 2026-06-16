@@ -15,6 +15,13 @@ def list_projects() -> list[dict]:
     return read_json(FILE_NAME, default=[])
 
 
+def get_project(project_id: str):
+    for project in list_projects():
+        if project["id"] == project_id:
+            return project
+    return None
+
+
 def create_project(data: ProjectCreate) -> dict:
     def mut(projects):
         project = {
