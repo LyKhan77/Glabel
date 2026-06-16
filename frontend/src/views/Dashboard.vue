@@ -58,7 +58,7 @@ const newPlayground = () => {
 }
 
 const openVisionSolution = () => {
-  alert('Mock: Opening File Picker...')
+  router.push('/journey')
 }
 
 const recentWorkspaces = ref([
