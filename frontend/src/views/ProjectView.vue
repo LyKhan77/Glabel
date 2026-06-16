@@ -1,60 +1,120 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  autoAnnotateDataset,
+  createDatasetVersion,
+  getProject,
+  listDatasetAssets,
+  listDatasetVersions,
+  uploadDatasetFiles
+} from '../api/client'
 
 const router = useRouter()
+const route = useRoute()
+const projectId = computed(() => route.params.id)
 
 const activeTab = ref('dataset') // 'dataset', 'versions', 'train'
+const project = ref(null)
+const assets = ref([])
+const errorMessage = ref('')
+const isLoading = ref(false)
 
 // Dataset state
 const datasetState = ref('unannotated') // 'unannotated', 'annotated'
 const fpsSlider = ref(2)
 const isDragging = ref(false)
 const showUploadModal = ref(false)
+const fileInput = ref(null)
 
 const onDragOver = (e) => { e.preventDefault(); isDragging.value = true }
 const onDragLeave = (e) => { e.preventDefault(); isDragging.value = false }
 const onDrop = (e) => {
   e.preventDefault(); 
   isDragging.value = false;
-  mockUpload()
+  uploadFiles(Array.from(e.dataTransfer.files))
 }
 
-const images = ref([
-  { id: 1, annotated: false },
-  { id: 2, annotated: false },
-  { id: 3, annotated: false },
-  { id: 4, annotated: false }
-])
-
-const unannotatedImages = computed(() => images.value.filter(img => !img.annotated))
-const annotatedImages = computed(() => images.value.filter(img => img.annotated))
+const unannotatedImages = computed(() => assets.value.filter(asset => asset.status === 'unannotated' && asset.kind !== 'video'))
+const annotatedImages = computed(() => assets.value.filter(asset => asset.status === 'annotated' && asset.kind !== 'video'))
 
 const goBack = () => {
   router.push('/')
 }
 
-const autoAnnotateAll = () => {
-  images.value.forEach(img => {
-    img.annotated = true
-  })
+const loadProject = async () => {
+  if (projectId.value === 'new') {
+    errorMessage.value = 'Create a project from the dashboard first.'
+    return
+  }
+  isLoading.value = true
+  errorMessage.value = ''
+  try {
+    const [projectData, assetData, versionData] = await Promise.all([
+      getProject(projectId.value),
+      listDatasetAssets(projectId.value),
+      listDatasetVersions(projectId.value)
+    ])
+    project.value = projectData
+    assets.value = assetData
+    versions.value = versionData
+  } catch (error) {
+    errorMessage.value = 'Could not load project data. Check backend status.'
+  } finally {
+    isLoading.value = false
+  }
 }
 
-const mockUpload = () => {
-  const newId = images.value.length ? Math.max(...images.value.map(i => i.id)) + 1 : 1
-  images.value.push({ id: newId, annotated: false })
-  images.value.push({ id: newId + 1, annotated: false })
+const autoAnnotateAll = async () => {
+  errorMessage.value = ''
+  try {
+    await autoAnnotateDataset(projectId.value)
+    assets.value = await listDatasetAssets(projectId.value)
+  } catch (error) {
+    errorMessage.value = 'Auto-annotate failed. Check backend status.'
+  }
+}
+
+const chooseFiles = () => {
+  fileInput.value?.click()
+}
+
+const onFileSelected = async (event) => {
+  await uploadFiles(Array.from(event.target.files || []))
+  event.target.value = ''
+}
+
+const uploadFiles = async (files) => {
+  if (!files.length) return
+  errorMessage.value = ''
+  try {
+    await uploadDatasetFiles(projectId.value, files, fpsSlider.value)
+    assets.value = await listDatasetAssets(projectId.value)
+  } catch (error) {
+    errorMessage.value = 'Upload failed. Check file type and backend status.'
+  }
   showUploadModal.value = false
-  alert('Mock: Media uploaded and processed!')
 }
 
 // Versions state
 const versions = ref([])
 const wizardStep = ref(0)
 
-const generateVersion = () => {
-  versions.value.push({ id: Date.now(), name: 'Version ' + (versions.value.length + 1) })
-  wizardStep.value = 0
+const generateVersion = async () => {
+  errorMessage.value = ''
+  try {
+    await createDatasetVersion(projectId.value, {
+      name: 'Version ' + (versions.value.length + 1),
+      split: { train: 70, valid: 20, test: 10 },
+      preprocessing: ['resize'],
+      augmentations: ['flip'],
+      multiplier: 1
+    })
+    versions.value = await listDatasetVersions(projectId.value)
+    wizardStep.value = 0
+  } catch (error) {
+    errorMessage.value = 'Could not create dataset version.'
+  }
 }
 
 // Train state
@@ -78,6 +138,8 @@ const startTraining = () => {
 const testInPlayground = () => {
   router.push('/playgrounds')
 }
+
+onMounted(loadProject)
 </script>
 
 <template>
@@ -100,9 +162,12 @@ const testInPlayground = () => {
         >[Train]</button>
       </div>
       <div class="spacer"></div>
+      <div class="project-title">{{ project?.name || 'Project' }}</div>
     </header>
 
     <main class="content">
+      <div v-if="isLoading" class="empty-state">Loading project...</div>
+      <div v-if="errorMessage" class="empty-state error-state">{{ errorMessage }}</div>
       <div v-if="activeTab === 'dataset'" class="dataset-view">
         <div class="dataset-subnav">
           <div class="subtabs">
@@ -126,7 +191,7 @@ const testInPlayground = () => {
         <div class="grid-container">
           <div v-if="datasetState === 'unannotated'" class="image-grid">
             <div class="image-card" v-for="img in unannotatedImages" :key="img.id">
-              <div class="image-placeholder">Image {{ img.id }}</div>
+              <div class="image-placeholder">{{ img.filename }}<br>{{ img.kind }}</div>
             </div>
             <div v-if="unannotatedImages.length === 0" class="empty-state">
               No unannotated images.
@@ -134,7 +199,7 @@ const testInPlayground = () => {
           </div>
           <div v-if="datasetState === 'annotated'" class="image-grid">
             <div class="image-card" v-for="img in annotatedImages" :key="img.id">
-              <div class="image-placeholder">Image {{ img.id }}<br>(Annotated)</div>
+              <div class="image-placeholder">{{ img.filename }}<br>(Annotated)</div>
             </div>
             <div v-if="annotatedImages.length === 0" class="empty-state">
               No annotated images.
@@ -171,7 +236,7 @@ const testInPlayground = () => {
 
         <ul class="version-list" v-if="versions.length > 0">
           <li v-for="version in versions" :key="version.id">
-            {{ version.name }}
+            {{ version.name }} - {{ version.asset_count }} annotated assets - {{ version.multiplier }}x
           </li>
         </ul>
         <div v-else class="empty-state">
@@ -182,6 +247,9 @@ const testInPlayground = () => {
       <div v-if="activeTab === 'train'" class="train-view">
         <div class="train-header">
           <h3>Train Model</h3>
+        </div>
+        <div class="empty-state">
+          Real local training is intentionally disabled in this integration. Dataset selection is real; progress below is a lightweight UI simulation.
         </div>
         <div class="train-controls">
           <label>Select Version: 
@@ -224,9 +292,9 @@ const testInPlayground = () => {
           >
             <p style="margin: 0;">Drag and drop files/folders here<br>or</p>
             <div class="upload-options" style="margin-top: 1rem; display: flex; gap: 1rem; justify-content: center;">
-              <button class="action-btn">[Choose Image Files]</button>
-              <button class="action-btn">[Choose Video File]</button>
+              <button class="action-btn" @click="chooseFiles">[Choose Image/Video Files]</button>
             </div>
+            <input ref="fileInput" type="file" multiple accept="image/*,video/*" class="hidden-input" @change="onFileSelected" />
           </div>
           <div style="margin-top: 1.5rem;">
             <label style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
@@ -236,7 +304,7 @@ const testInPlayground = () => {
             <input type="range" v-model="fpsSlider" min="1" max="60" class="slider" style="width: 100%; display: block; box-sizing: border-box;" />
           </div>
           <div style="margin-top: 2rem; text-align: right;">
-            <button class="action-btn" @click="mockUpload">[Upload & Process]</button>
+            <button class="action-btn" @click="chooseFiles">[Upload & Process]</button>
           </div>
         </div>
       </div>
@@ -266,6 +334,10 @@ const testInPlayground = () => {
 
 .spacer {
   flex-grow: 1;
+}
+
+.project-title {
+  color: #646262;
 }
 
 button {
@@ -347,6 +419,14 @@ button:hover {
   color: #646262;
   font-style: italic;
   padding: 2rem 0;
+}
+
+.error-state {
+  color: #8a1f11;
+}
+
+.hidden-input {
+  display: none;
 }
 
 button:disabled {

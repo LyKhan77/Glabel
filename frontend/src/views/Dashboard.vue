@@ -11,7 +11,10 @@
     <main class="main-content">
       <section class="projects-section">
         <h2>Open Vision Projects</h2>
-        <div class="projects-grid">
+        <div v-if="isLoading" class="empty-state">Loading projects...</div>
+        <div v-else-if="errorMessage" class="empty-state error-state">{{ errorMessage }}</div>
+        <div v-else-if="openVisionProjects.length === 0" class="empty-state">No projects yet.</div>
+        <div v-else class="projects-grid">
           <div class="project-card" v-for="project in openVisionProjects" :key="project.id" @click="openProject(project.id)">
             <h3>{{ project.name }}</h3>
             <p class="path">{{ project.description }}</p>
@@ -28,22 +31,22 @@
           <button class="btn sm-btn" @click="showModal = false">[x] Close</button>
         </div>
         <div style="margin-bottom: 1rem;">
-          <input type="text" placeholder="Workspace Name" class="austere-input" />
+          <input v-model="projectName" type="text" placeholder="Workspace Name" class="austere-input" />
         </div>
         <div class="modal-split">
           <!-- Left Column -->
           <div class="modal-col">
             <h3>AI Assistant</h3>
             <textarea v-model="aiPrompt" placeholder="Describe your vision pipeline..."></textarea>
-            <button class="btn" @click="submitNewProject">Generate Pipeline</button>
+            <button class="btn" @click="submitNewProject()">Generate Pipeline</button>
           </div>
           <!-- Right Column -->
           <div class="modal-col">
             <h3>Manual Tasks</h3>
             <div class="task-grid">
-              <button class="btn" @click="submitNewProject">Object Detection</button>
-              <button class="btn" @click="submitNewProject">Segmentation</button>
-              <button class="btn" @click="submitNewProject">OCR</button>
+            <button class="btn" @click="submitNewProject('Object Detection')">Object Detection</button>
+            <button class="btn" @click="submitNewProject('Segmentation')">Segmentation</button>
+            <button class="btn" @click="submitNewProject('OCR')">OCR</button>
             </div>
           </div>
         </div>
@@ -53,27 +56,54 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { createProject, listProjects } from '../api/client'
 
 const router = useRouter()
 
 const showModal = ref(false)
 const aiPrompt = ref('')
+const projectName = ref('')
+const errorMessage = ref('')
+const isLoading = ref(false)
 
-const openVisionProjects = ref([
-  { id: 'proj-001', name: 'PPE Detection', description: 'Detect hardhats and vests' },
-  { id: 'proj-002', name: 'OCR License Plate', description: 'Extract text from vehicle plates' }
-])
+const openVisionProjects = ref([])
+
+const loadProjects = async () => {
+  isLoading.value = true
+  errorMessage.value = ''
+  try {
+    openVisionProjects.value = await listProjects()
+  } catch (error) {
+    errorMessage.value = 'Backend unavailable. Start FastAPI on http://127.0.0.1:8000.'
+  } finally {
+    isLoading.value = false
+  }
+}
 
 const openProject = (id) => {
   router.push(`/project/${id}`)
 }
 
-const submitNewProject = () => {
-  showModal.value = false
-  router.push('/project/new')
+const submitNewProject = async (taskType = 'Generated Pipeline') => {
+  errorMessage.value = ''
+  const fallbackName = aiPrompt.value.trim() || taskType
+  try {
+    const project = await createProject({
+      name: projectName.value.trim() || fallbackName,
+      description: aiPrompt.value.trim() || taskType
+    })
+    showModal.value = false
+    projectName.value = ''
+    aiPrompt.value = ''
+    router.push(`/project/${project.id}`)
+  } catch (error) {
+    errorMessage.value = 'Could not create project. Check backend status.'
+  }
 }
+
+onMounted(loadProjects)
 </script>
 
 <style scoped>
@@ -136,6 +166,16 @@ h3 {
 
 .project-card:hover {
   background-color: rgba(32, 29, 29, 0.05);
+}
+
+.empty-state {
+  color: var(--border-color, #646262);
+  font-style: italic;
+  padding: 1rem 0;
+}
+
+.error-state {
+  color: #8a1f11;
 }
 
 .btn {
