@@ -12,7 +12,7 @@
           <button class="btn action-btn" @click="newPlayground">
             <span class="icon">[+]</span> New Inference Playground
           </button>
-          <button class="btn action-btn">
+          <button class="btn action-btn" @click="openVisionSolution">
             <span class="icon">[Folder]</span> Open Vision Solution
           </button>
         </div>
@@ -37,7 +37,7 @@
               <td class="path">{{ ws.path }}</td>
               <td>{{ ws.lastModified }}</td>
               <td>
-                <button class="btn sm-btn">[-] Remove</button>
+                <button class="btn sm-btn" @click="removeWorkspace(ws.id)">[-] Remove</button>
               </td>
             </tr>
           </tbody>
@@ -57,11 +57,19 @@ const newPlayground = () => {
   router.push('/workspace')
 }
 
+const openVisionSolution = () => {
+  alert('Mock: Opening File Picker...')
+}
+
 const recentWorkspaces = ref([
   { id: 'ws-001', name: 'Face Detection Prod', path: '/home/user/glabel-projects/face-detect', lastModified: '2026-06-15 14:32' },
   { id: 'ws-002', name: 'Object Tracking Test', path: '/home/user/glabel-projects/obj-track', lastModified: '2026-06-14 09:15' },
   { id: 'ws-003', name: 'OCR Pipeline', path: '/home/user/glabel-projects/ocr-pipe', lastModified: '2026-06-10 11:45' }
 ])
+
+const removeWorkspace = (id) => {
+  recentWorkspaces.value = recentWorkspaces.value.filter(ws => ws.id !== id)
+}
 </script>
 
 <style scoped>
