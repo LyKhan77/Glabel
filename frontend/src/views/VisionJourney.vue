@@ -6,8 +6,22 @@
     </header>
 
     <main class="main-content">
-      <div v-if="currentStep === 1">
-        <!-- Step 1 placeholder -->
+      <div v-if="currentStep === 1" class="step-container">
+        <h2>1. Define Task</h2>
+        <div class="form-group">
+          <label for="taskName">Task Name</label>
+          <input type="text" id="taskName" placeholder="e.g. Defect Detection" class="input-field" />
+        </div>
+        <div class="form-group">
+          <label for="taskType">Task Type</label>
+          <select id="taskType" class="input-field">
+            <option value="object_detection">Object Detection</option>
+            <option value="segmentation">Segmentation</option>
+          </select>
+        </div>
+        <div class="step-actions">
+          <button class="btn primary-btn" @click="currentStep = 2">[>] Start Journey</button>
+        </div>
       </div>
     </main>
   </div>
@@ -66,5 +80,48 @@ const cancel = () => {
 .btn:hover {
   background: #201d1d;
   color: #fdfcfc;
+}
+
+.step-container {
+  margin-top: 1rem;
+}
+
+.step-container h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px dashed #646262;
+  padding-bottom: 0.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.input-field {
+  padding: 0.5rem;
+  font-family: 'Berkeley Mono', monospace;
+  border: 1px solid #646262;
+  background: transparent;
+  color: #201d1d;
+  border-radius: 4px;
+}
+
+.step-actions {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.primary-btn {
+  background: #201d1d;
+  color: #fdfcfc;
+}
+
+.primary-btn:hover {
+  background: transparent;
+  color: #201d1d;
 }
 </style>
