@@ -4,13 +4,16 @@ import App from './App.vue'
 import Dashboard from './views/Dashboard.vue'
 import PlaygroundsDashboard from './views/PlaygroundsDashboard.vue'
 import Workspace from './views/Workspace.vue'
-import VisionJourney from './views/VisionJourney.vue'
+import ModelsView from './views/ModelsView.vue'
+import SettingsView from './views/SettingsView.vue'
 
 const routes = [
   { path: '/', component: Dashboard },
   { path: '/project/:id', component: () => import('./views/ProjectView.vue') },
   { path: '/playgrounds', component: PlaygroundsDashboard },
-  { path: '/playgrounds/:id', component: Workspace }
+  { path: '/playgrounds/:id', component: Workspace },
+  { path: '/models', component: ModelsView },
+  { path: '/settings', component: SettingsView }
 ]
 
 const router = createRouter({
