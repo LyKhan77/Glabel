@@ -1,0 +1,1 @@
+Follow all the instructions in `AGENTS.md`. Update as required.
