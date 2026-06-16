@@ -23,14 +23,14 @@ Open-source, **local-first** visual pipeline builder for Computer Vision (ComfyU
 ## Tech Stack · `[KEEP UPDATED]`
 
 - Frontend: Vue 3, Vite 4, `@vue-flow/core`, `vue-router` (Node v22).
-- Backend: FastAPI, Uvicorn, Pydantic v2, `filelock`, pytest + httpx (Python 3.10+).
+- Backend: FastAPI, Uvicorn, Pydantic v2, `filelock`, OpenCV headless, pytest + httpx (Python 3.10+).
 - Storage: flat JSON files (local `./glabel_data`, gitignored).
 - Planned: PyTorch, `ultralytics` (YOLOv11, RT-DETR), WebSockets.
 
 ## Key Features · `[KEEP UPDATED]`
 
-- Done: VueFlow node canvas (input/inference/output), app shell (Dashboard, Models, Playgrounds, Project, Settings, Vision Journey, Workspace), atomic JSON storage, Projects CRUD API, `/health`.
-- Planned: frontend↔backend API integration, WebSocket streaming, Ultralytics training lifecycle, dataset upload + auto-annotation, Playground DAG execution.
+- Done: VueFlow node canvas, app shell, frontend/backend project integration, atomic JSON storage, Projects CRUD API, dataset upload/video frame extraction, annotation state, dataset versions, `/health`.
+- Planned: WebSocket streaming, real SAM/YOLO annotation output, Ultralytics training lifecycle, image serving, Playground DAG execution.
 
 ## Project Structure · `[KEEP UPDATED]`
 
@@ -66,14 +66,18 @@ glabel/
 │  │  ├─ config.py                # get_data_dir() (env GLABEL_DATA_DIR)
 │  │  └─ storage.py               # atomic + locked JSON read/write/update
 │  ├─ schemas/
-│  │  └─ project.py               # Pydantic models
+│  │  ├─ project.py
+│  │  └─ dataset.py               # Dataset asset/version models
 │  ├─ services/
-│  │  └─ projects.py              # CRUD logic via update_json
+│  │  ├─ projects.py              # CRUD logic via update_json
+│  │  └─ datasets.py              # Upload, frame extraction, versions
 │  ├─ api/v1/
-│  │  └─ projects.py              # thin REST routes (/api/v1/projects)
+│  │  ├─ projects.py              # thin REST routes (/api/v1/projects)
+│  │  └─ datasets.py              # dataset + version routes
 │  └─ tests/
 │     ├─ test_storage.py
-│     └─ test_projects_api.py
+│     ├─ test_projects_api.py
+│     └─ test_dataset_api.py
 │     # (each backend/ subpackage also has an empty __init__.py — not shown)
 ├─ docs/                          # gitignored — plans/specs/assets, NOT committed
 │  ├─ plans/                      # implementation plans (working artifacts)
@@ -92,7 +96,7 @@ glabel/
 
 <!-- Do NOT change these without re-verifying. See README §Perintah Project. -->
 Frontend: `cd frontend && npm install && npm run dev` (Vite → :3000).
-Backend (run from project root): `python -m pip install -r backend/requirements.txt`, `python -m uvicorn backend.main:app --reload` (:8000), `python -m pytest backend/tests/ -v`.
+Backend (run from project root): `python -m venv .venv`, `.\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt`, `.\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload` (:8000), `.\.venv\Scripts\python.exe -m pytest backend/tests/ -v`.
 
 ## Coding Conventions · `[KEEP UPDATED]`
 
@@ -112,13 +116,14 @@ Backend (run from project root): `python -m pip install -r backend/requirements.
 
 ## Current State (Changelog) · `[KEEP UPDATED]`
 
-**Status:** Frontend complete. Backend scaffolded (atomic JSON storage + Projects CRUD). Frontend↔backend integration not yet wired. Active branch `backend/implementation-v1` (pushed, PR pending).
+**Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, annotation state, and dataset version metadata. Real model training remains out of scope. Active branch `backend/implementation-v1`.
 
 - **2026-06-16** — Backend scaffold: FastAPI package, atomic/locked `storage.py`, Projects CRUD, `/health`, CORS (`:3000`), `lifespan`. 9 tests green.
 - **2026-06-16** — Frontend: Vue 3 + VueFlow canvas + app shell (prior work).
 - **2026-06-17** — Added README.md; expanded AGENTS.md project sections (this block).
+- **2026-06-17** — Added `.venv` workflow, OpenCV-backed dataset upload/video frame extraction APIs, dataset versions, and frontend API client wiring.
 
-**Next:** frontend API client, WebSocket layer, Ultralytics training lifecycle, dataset/auto-annotation.
+**Next:** WebSocket layer, real SAM/YOLO annotation output, image serving, Ultralytics training lifecycle.
 
 ## Documentation Maintenance
 

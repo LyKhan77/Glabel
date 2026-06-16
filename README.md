@@ -30,6 +30,7 @@ The project intentionally avoids heavy infrastructure: no SQL database, no Docke
 | ASGI server | Uvicorn (`[standard]`) | >=0.27 |
 | Validation | Pydantic v2 | >=2.6 |
 | Concurrency / file lock | `filelock` | >=3.13 |
+| Video frame extraction | `opencv-python-headless` | >=4.10 |
 | ML (planned) | PyTorch, `ultralytics` (YOLOv11, RT-DETR) | future |
 | Storage | Flat JSON files (local `./glabel_data`) | — |
 | Tests | pytest + httpx | >=8.0 / >=0.27 |
@@ -42,13 +43,15 @@ The project intentionally avoids heavy infrastructure: no SQL database, no Docke
 - App shell: Dashboard, Models, Playgrounds, Project, Settings, Vision Journey, Workspace views.
 - Backend: atomic, lock-protected JSON storage engine (crash-safe, race-free).
 - Backend: full Projects CRUD REST API + `/health`.
+- Frontend/backend integration for project list, create, and detail flows.
+- Backend dataset upload API with image/video ingestion and OpenCV frame extraction.
+- Backend dataset auto-annotation state transition and dataset version metadata.
 - Per-project local data directory (`GLABEL_DATA_DIR`), gitignored.
 
 **Planned (roadmap):**
-- Frontend ↔ backend API integration (frontend currently has no HTTP client).
 - WebSocket layer streaming Ultralytics training epochs / playground inference signals.
-- Dataset upload, image serving, auto-annotation (YOLO `.txt`).
-- Model training lifecycle, versioning, and Playground DAG execution.
+- Real SAM/YOLO auto-annotation output and image serving.
+- Model training lifecycle and Playground DAG execution.
 - Pose estimation, instance segmentation, classification tasks.
 
 ## Project Structure  ·  `[KEEP UPDATED]`
@@ -58,6 +61,7 @@ glabel/
 ├─ frontend/                  # Vue 3 + Vite + VueFlow app (dev :3000)
 │  ├─ src/
 │  │  ├─ App.vue, main.js
+│  │  ├─ api/client.js        # fetch client for FastAPI
 │  │  ├─ views/               # Dashboard, ModelsView, PlaygroundsDashboard,
 │  │  │                       # ProjectView, SettingsView, VisionJourney, Workspace
 │  │  ├─ components/layout/   # Sidebar
@@ -68,10 +72,10 @@ glabel/
 │  ├─ core/
 │  │  ├─ config.py            # get_data_dir() (env GLABEL_DATA_DIR)
 │  │  └─ storage.py           # atomic + locked JSON read/write/update
-│  ├─ api/v1/projects.py      # thin REST routes → services
-│  ├─ services/projects.py    # CRUD business logic (atomic update_json)
-│  ├─ schemas/project.py      # Pydantic models
-│  ├─ tests/                  # pytest: test_storage.py, test_projects_api.py
+│  ├─ api/v1/                 # thin REST routes → services
+│  ├─ services/               # CRUD, dataset ingestion, version logic
+│  ├─ schemas/                # Pydantic models
+│  ├─ tests/                  # pytest backend API/storage tests
 │  └─ requirements.txt
 ├─ docs/            # plans + specs (gitignored — NOT committed)
 ├─ DESIGN.md                  # frontend visual design reference
@@ -94,9 +98,10 @@ npm run preview    # preview the production build
 
 **Backend** (run from the **project root**, package mode):
 ```bash
-python -m pip install -r backend/requirements.txt
-python -m uvicorn backend.main:app --reload    # → http://127.0.0.1:8000
-python -m pytest backend/tests/ -v             # 9 tests, expect all pass
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload    # → http://127.0.0.1:8000
+.\.venv\Scripts\python.exe -m pytest backend/tests/ -v             # 14 tests, expect all pass
 ```
 
 > Run the backend from the project root (not from inside `backend/`): the app is a package (`uvicorn backend.main:app`), so imports like `from backend.core.storage import ...` resolve correctly.
@@ -108,8 +113,14 @@ python -m pytest backend/tests/ -v             # 9 tests, expect all pass
 | GET | `/health` | Liveness probe → `{"status":"ok"}` |
 | GET | `/api/v1/projects/` | List all projects |
 | POST | `/api/v1/projects/` | Create (`{"name","description?"}`) → 201 |
+| GET | `/api/v1/projects/{id}` | Get project detail |
 | PATCH | `/api/v1/projects/{id}` | Partial update (`{"name?","description?"}`) → 200 |
 | DELETE | `/api/v1/projects/{id}` | Delete → 200 `{"status":"deleted","id"}` |
+| POST | `/api/v1/projects/{id}/dataset/upload` | Upload image/video files; videos extract frames via OpenCV |
+| GET | `/api/v1/projects/{id}/dataset/assets` | List dataset assets (`?status=unannotated|annotated`) |
+| POST | `/api/v1/projects/{id}/dataset/auto-annotate` | Mark non-video dataset assets as annotated |
+| GET | `/api/v1/projects/{id}/versions` | List dataset versions |
+| POST | `/api/v1/projects/{id}/versions` | Create dataset version metadata |
 
 Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 
@@ -133,7 +144,7 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 
 ## Current State & Changelog  ·  `[KEEP UPDATED]`
 
-**Status:** Frontend complete. Backend scaffolded (atomic JSON storage + Projects CRUD). Frontend↔backend integration not yet wired.
+**Status:** Frontend and backend are integrated for project CRUD, dataset upload, video frame extraction, mock annotation state, and dataset version metadata. Real model training remains intentionally out of scope for this branch.
 
 **Active branch:** `backend/implementation-v1` (pushed to `origin`; PR pending).
 
@@ -141,11 +152,11 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 - **2026-06-16** — Backend scaffold: FastAPI package, atomic/locked JSON `storage.py`, Projects CRUD (`/api/v1/projects/`), `/health`, CORS for Vite `:3000`, `lifespan` placeholder. 9 tests green.
 - **2026-06-16** — Frontend: Vue 3 + VueFlow canvas + app shell (built earlier, prior work).
 - **2026-06-17** — Added `README.md` and expanded `AGENTS.md` project sections.
+- **2026-06-17** — Added `.venv` workflow, OpenCV-backed dataset upload/video frame extraction APIs, dataset version APIs, and frontend API integration.
 
 **In development / next:**
-- Frontend API client + `VITE_API_URL` wiring.
 - WebSocket layer (training progress, playground inference).
-- Ultralytics training lifecycle; dataset upload + auto-annotation.
+- Real SAM/YOLO annotation output, image serving, Ultralytics training lifecycle.
 
 ---
 
