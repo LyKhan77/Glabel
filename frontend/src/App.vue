@@ -1,25 +1,16 @@
 <template>
-  <div class="app-root">
-    <router-view></router-view>
+  <div class="app-layout">
+    <Sidebar />
+    <main class="main-content">
+      <router-view></router-view>
+    </main>
   </div>
 </template>
-
 <script setup>
+import Sidebar from './components/layout/Sidebar.vue'
 </script>
-
 <style>
-/* Global Styles for Terminal-Style Austere Design */
-body {
-  margin: 0;
-  padding: 0;
-  font-family: 'Berkeley Mono', monospace;
-  background-color: #fdfcfc;
-  color: #201d1d;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-/* No drop shadows, 0px container radius globally */
+body { margin: 0; background: #fdfcfc; color: #201d1d; font-family: 'Berkeley Mono', monospace; }
+.app-layout { display: flex; height: 100vh; overflow: hidden; }
+.main-content { flex: 1; overflow-y: auto; position: relative; }
 </style>

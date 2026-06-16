@@ -7,8 +7,7 @@ import VisionJourney from './views/VisionJourney.vue'
 
 const routes = [
   { path: '/', component: Dashboard },
-  { path: '/workspace', component: Workspace },
-  { path: '/journey', component: VisionJourney }
+  { path: '/playgrounds', component: Workspace }
 ]
 
 const router = createRouter({
