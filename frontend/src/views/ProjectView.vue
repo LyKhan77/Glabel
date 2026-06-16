@@ -28,6 +28,37 @@ const autoAnnotateAll = () => {
     img.annotated = true
   })
 }
+
+// Versions state
+const versions = ref([])
+const wizardStep = ref(0)
+
+const generateVersion = () => {
+  versions.value.push({ id: Date.now(), name: 'Version ' + (versions.value.length + 1) })
+  wizardStep.value = 0
+}
+
+// Train state
+const selectedVersion = ref(null)
+const trainingProgress = ref(0)
+const isTraining = ref(false)
+
+const startTraining = () => {
+  if (!selectedVersion.value) return
+  isTraining.value = true
+  trainingProgress.value = 0
+  const interval = setInterval(() => {
+    trainingProgress.value += 10
+    if (trainingProgress.value >= 100) {
+      clearInterval(interval)
+      isTraining.value = false
+    }
+  }, 500)
+}
+
+const testInPlayground = () => {
+  router.push('/playgrounds')
+}
 </script>
 
 <template>
@@ -94,11 +125,66 @@ const autoAnnotateAll = () => {
       </div>
       
       <div v-if="activeTab === 'versions'" class="versions-view">
-        <p>[Versions Content]</p>
+        <div class="versions-header">
+          <h3>Versions</h3>
+          <button class="action-btn" @click="wizardStep = wizardStep ? 0 : 1">[Generate New Version]</button>
+        </div>
+        
+        <div v-if="wizardStep > 0" class="wizard-container">
+          <div v-if="wizardStep === 1" class="wizard-step">
+            <p>Train/Valid/Test Split (70/20/10)</p>
+            <button class="action-btn" @click="wizardStep = 2">[Next]</button>
+          </div>
+          <div v-if="wizardStep === 2" class="wizard-step">
+            <p>Preprocessing</p>
+            <label><input type="checkbox" /> Resize</label>
+            <label><input type="checkbox" /> Grayscale</label>
+            <button class="action-btn" @click="wizardStep = 3">[Next]</button>
+          </div>
+          <div v-if="wizardStep === 3" class="wizard-step">
+            <p>Augmentations</p>
+            <label><input type="checkbox" /> Flip</label>
+            <label><input type="checkbox" /> Rotate</label>
+            <p>Multiplier: <input type="number" value="1" min="1" class="number-input" /></p>
+            <button class="action-btn" @click="generateVersion">[Generate]</button>
+          </div>
+        </div>
+
+        <ul class="version-list" v-if="versions.length > 0">
+          <li v-for="version in versions" :key="version.id">
+            {{ version.name }}
+          </li>
+        </ul>
+        <div v-else class="empty-state">
+          No versions generated yet.
+        </div>
       </div>
 
       <div v-if="activeTab === 'train'" class="train-view">
-        <p>[Train Content]</p>
+        <div class="train-header">
+          <h3>Train Model</h3>
+        </div>
+        <div class="train-controls">
+          <label>Select Version: 
+            <select v-model="selectedVersion" class="select-input">
+              <option v-for="version in versions" :key="version.id" :value="version.id">
+                {{ version.name }}
+              </option>
+            </select>
+          </label>
+          <button class="action-btn" @click="startTraining" :disabled="!selectedVersion || isTraining">[Start Training]</button>
+        </div>
+        
+        <div v-if="trainingProgress > 0" class="progress-container">
+          <p>Training Progress: {{ trainingProgress }}%</p>
+          <div class="progress-bar">
+            <div class="progress-fill" :style="{ width: trainingProgress + '%' }"></div>
+          </div>
+        </div>
+        
+        <div v-if="trainingProgress === 100 && !isTraining" class="test-container">
+          <button class="action-btn" @click="testInPlayground">[Test in Playground]</button>
+        </div>
       </div>
     </main>
   </div>
@@ -207,5 +293,88 @@ button:hover {
   color: #646262;
   font-style: italic;
   padding: 2rem 0;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.versions-view, .train-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.versions-header, .train-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px dashed #646262;
+  padding-bottom: 1rem;
+}
+
+.versions-header h3, .train-header h3 {
+  margin: 0;
+  font-weight: normal;
+}
+
+.wizard-container {
+  border: 1px solid #646262;
+  padding: 1rem;
+}
+
+.wizard-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.number-input, .select-input {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid #646262;
+  padding: 0.25rem;
+}
+
+.version-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.version-list li {
+  border: 1px solid #646262;
+  padding: 0.5rem;
+}
+
+.train-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.progress-bar {
+  height: 1rem;
+  border: 1px solid #646262;
+  width: 100%;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #201d1d;
+  transition: width 0.3s;
 }
 </style>
