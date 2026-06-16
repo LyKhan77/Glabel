@@ -9,7 +9,7 @@
       <section class="actions-section">
         <h2>Actions</h2>
         <div class="actions">
-          <button class="btn action-btn">
+          <button class="btn action-btn" @click="newPlayground">
             <span class="icon">[+]</span> New Inference Playground
           </button>
           <button class="btn action-btn">
@@ -49,6 +49,13 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+const newPlayground = () => {
+  router.push('/workspace')
+}
 
 const recentWorkspaces = ref([
   { id: 'ws-001', name: 'Face Detection Prod', path: '/home/user/glabel-projects/face-detect', lastModified: '2026-06-15 14:32' },
