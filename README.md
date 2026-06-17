@@ -156,13 +156,14 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 **Active branch:** `backend/implementation-v1` (pushed to `origin`; PR pending).
 
 ### Changelog
-- **2026-06-16** — Backend scaffold: FastAPI package, atomic/locked JSON `storage.py`, Projects CRUD (`/api/v1/projects/`), `/health`, CORS for Vite `:3000`, `lifespan` placeholder. 9 tests green.
-- **2026-06-16** — Frontend: Vue 3 + VueFlow canvas + app shell (built earlier, prior work).
-- **2026-06-17** — Added `README.md` and expanded `AGENTS.md` project sections.
-- **2026-06-17** — Added `.venv` workflow, OpenCV-backed dataset upload/video frame extraction APIs, dataset version APIs, and frontend API integration.
-- **2026-06-17** — Added Windows PowerShell dev scripts for starting/stopping backend + frontend together.
-- **2026-06-17** — Implemented Assignment UI and Embedded Annotation Workspace scaffold inside frontend `ProjectView.vue`.
-- **2026-06-17** — Implemented Interactive Canvas Editor (Phase 2A & 2B) with native SVG overlay for Pan/Zoom, Classes CRUD, BBox, Polygon, and COCO Skeleton Template generation tools. Added Save Annotations API.
+| Date | Feature | Before | After |
+|---|---|---|---|
+| **2026-06-16** | Backend scaffold | Kosong | FastAPI package, atomic JSON `storage.py`, Projects CRUD, `/health`, CORS, `lifespan` placeholder. |
+| **2026-06-16** | Frontend app shell | Kosong | Vue 3 + VueFlow canvas + app shell (prior work). |
+| **2026-06-17** | Documentation | Hanya `AGENTS.md` sederhana | `README.md` lengkap dan ekstensi seksi proyek di `AGENTS.md`. |
+| **2026-06-17** | Dataset APIs & Scripts | Upload belum didukung | API *upload* OpenCV, *video frame extraction*, *PowerShell scripts*, dan integrasi API *frontend*. |
+| **2026-06-17** | Annotation Workspace | Tampilan *Project* kosong | UI Assignment & *scaffold* Workspace di `ProjectView.vue`. |
+| **2026-06-17** | Interactive Canvas Editor | *Mock overlays* statis (HTML biasa) | *Native SVG overlay* untuk *Pan/Zoom*, *Classes CRUD*, *BBox*, *Polygon*, dan *COCO Skeleton Template*. Tersedia *Save API*. |
 
 **In development / next:**
 - WebSocket layer (training progress, playground inference).

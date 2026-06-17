@@ -120,13 +120,15 @@ Full local app: install dependencies manually first, then `.\scripts\start-dev.p
 
 **Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, annotation state, dataset version metadata, and interactive canvas annotation tools (Classes, BBox, Polygon, Pose Skeleton). Active branch `backend/implementation-v1`.
 
-- **2026-06-16** — Backend scaffold: FastAPI package, atomic/locked `storage.py`, Projects CRUD, `/health`, CORS (`:3000`), `lifespan`. 9 tests green.
-- **2026-06-16** — Frontend: Vue 3 + VueFlow canvas + app shell (prior work).
-- **2026-06-17** — Added README.md; expanded AGENTS.md project sections (this block).
-- **2026-06-17** — Added `.venv` workflow, OpenCV-backed dataset upload/video frame extraction APIs, dataset versions, and frontend API client wiring.
-- **2026-06-17** — Added Windows PowerShell dev scripts for starting/stopping backend + frontend together.
-- **2026-06-17** — Implemented embedded Annotation Workspace scaffold in frontend `ProjectView.vue`.
-- **2026-06-17** — Implemented Interactive Canvas Editor (Phase 2A & 2B) with native SVG overlay for Pan/Zoom, Classes CRUD, BBox, Polygon, and COCO Skeleton Template generation tools. Added Save Annotations API.
+| Date | Feature | Before | After |
+|---|---|---|---|
+| **2026-06-16** | Backend scaffold | Kosong | FastAPI package, atomic JSON `storage.py`, Projects CRUD, `/health`, CORS, `lifespan` placeholder. |
+| **2026-06-16** | Frontend app shell | Kosong | Vue 3 + VueFlow canvas + app shell (prior work). |
+| **2026-06-17** | Documentation | Hanya `AGENTS.md` sederhana | `README.md` lengkap dan ekstensi seksi proyek di `AGENTS.md`. |
+| **2026-06-17** | Dataset APIs & Scripts | Upload belum didukung | API *upload* OpenCV, *video frame extraction*, *PowerShell scripts*, dan integrasi API *frontend*. |
+| **2026-06-17** | Annotation Workspace | Tampilan *Project* kosong | UI Assignment & *scaffold* Workspace di `ProjectView.vue`. |
+| **2026-06-17** | Interactive Canvas Editor | *Mock overlays* statis (HTML biasa) | *Native SVG overlay* untuk *Pan/Zoom*, *Classes CRUD*, *BBox*, *Polygon*, dan *COCO Skeleton Template*. Tersedia *Save API*. |
+
 **Next:** WebSocket layer, real SAM/YOLO auto-annotation output integration, Ultralytics training lifecycle execution.
 
 ## Documentation Maintenance
