@@ -29,6 +29,7 @@ def create_project(data: ProjectCreate) -> dict:
             "name": data.name,
             "description": data.description,
             "task_type": data.task_type,
+            "classes": data.classes,
             "created_at": _now(),
             "updated_at": _now(),
         }
@@ -46,6 +47,8 @@ def update_project(project_id: str, data: ProjectUpdate):
                     p["name"] = data.name
                 if data.description is not None:
                     p["description"] = data.description
+                if data.classes is not None:
+                    p["classes"] = data.classes
                 p["updated_at"] = _now()
                 return p
         return None

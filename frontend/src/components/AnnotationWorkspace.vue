@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { updateProject } from '../api/client.js'
 
 const props = defineProps({
   project: {
@@ -27,6 +28,43 @@ const annotatedAssets = computed(() => props.assets.filter(a => a.status === 'an
 const currentList = computed(() => activeTab.value === 'unannotated' ? unannotatedAssets.value : annotatedAssets.value)
 
 const selectedImage = ref(null)
+
+const newClassName = ref('')
+const projectClasses = ref(props.project.classes || [])
+const activeClass = ref(null)
+
+const generateRandomColor = () => {
+  return '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')
+}
+
+const addClass = async () => {
+  if (!newClassName.value.trim()) return
+  const newClass = {
+    id: Date.now().toString(),
+    name: newClassName.value.trim(),
+    color: generateRandomColor()
+  }
+  projectClasses.value.push(newClass)
+  newClassName.value = ''
+  
+  try {
+    await updateProject(props.project.id, { classes: projectClasses.value })
+  } catch (error) {
+    console.error("Failed to update project classes:", error)
+  }
+}
+
+const removeClass = async (classId) => {
+  projectClasses.value = projectClasses.value.filter(c => c.id !== classId)
+  if (activeClass.value?.id === classId) {
+    activeClass.value = null
+  }
+  try {
+    await updateProject(props.project.id, { classes: projectClasses.value })
+  } catch (error) {
+    console.error("Failed to update project classes:", error)
+  }
+}
 
 const getImageUrl = (img) => `${props.apiBaseUrl}/api/v1/projects/${props.project.id}/dataset/assets/${img.id}/image`
 
@@ -137,6 +175,29 @@ const saveAnnotation = () => {
       </div>
       <p v-else class="empty-canvas-message">Select an image from the sidebar to start annotating.</p>
     </div>
+    <div class="right-sidebar">
+      <div class="sidebar-header">
+        <h3>Classes</h3>
+      </div>
+      <div class="classes-panel">
+        <div class="add-class-form">
+          <input v-model="newClassName" type="text" placeholder="New class name..." @keyup.enter="addClass" />
+          <button class="primary-btn" @click="addClass">Add</button>
+        </div>
+        <div class="class-list">
+          <div v-for="c in projectClasses" :key="c.id"
+               :class="['class-item', { active: activeClass?.id === c.id }]"
+               @click="activeClass = c">
+            <span class="color-dot" :style="{ backgroundColor: c.color }"></span>
+            <span class="class-name">{{ c.name }}</span>
+            <button class="del-btn" @click.stop="removeClass(c.id)">Del</button>
+          </div>
+          <div v-if="projectClasses.length === 0" class="empty-state">
+            No classes defined.
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -153,6 +214,14 @@ const saveAnnotation = () => {
   border-right: 1px solid var(--border-color, #646262);
   display: flex;
   flex-direction: column;
+}
+
+.right-sidebar {
+  width: 250px;
+  border-left: 1px solid var(--border-color, #646262);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-color, #fdfcfc);
 }
 
 .sidebar-header {
@@ -337,5 +406,77 @@ const saveAnnotation = () => {
   overflow-y: auto;
   font-style: normal;
   margin: 0;
+}
+
+.classes-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 0.5rem;
+  gap: 1rem;
+}
+
+.add-class-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.add-class-form input {
+  flex: 1;
+  padding: 0.3rem;
+  border: 1px solid var(--border-color, #646262);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.class-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.class-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem;
+  border: 1px solid var(--border-color, #646262);
+  cursor: pointer;
+}
+
+.class-item:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+.class-item.active {
+  background: var(--text-color, #201d1d);
+  color: var(--bg-color, #fdfcfc);
+}
+
+.color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid #fff;
+  box-shadow: 0 0 0 1px #000;
+}
+
+.class-name {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.del-btn {
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.del-btn:hover {
+  background: #cc0000;
 }
 </style>
