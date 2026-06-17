@@ -45,7 +45,8 @@ Reply ONLY with a valid JSON object in this exact format, with no markdown forma
     
     // Attempt to parse JSON
     try {
-      const parsed = JSON.parse(resultText);
+      const cleanText = resultText.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleanText);
       return parsed;
     } catch (e) {
       console.error("Failed to parse LLM response as JSON:", resultText);

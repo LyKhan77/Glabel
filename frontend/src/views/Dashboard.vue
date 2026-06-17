@@ -30,6 +30,7 @@
           <h2>Create New Project</h2>
           <button class="btn sm-btn" @click="showModal = false">[x] Close</button>
         </div>
+        <div v-if="errorMessage" class="empty-state error-state" style="margin-bottom: 1rem; padding: 0.5rem; background: #ffebeb; border: 1px solid #8a1f11;">{{ errorMessage }}</div>
         <div class="tabs" style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color, #646262); padding-bottom: 0.5rem;">
           <button class="btn sm-btn" :class="{ active: activeTab === 'manual' }" @click="activeTab = 'manual'" style="margin-right: 0.5rem;" :style="activeTab === 'manual' ? 'background: var(--text-color, #201d1d); color: var(--bg-color, #fdfcfc);' : ''">Manual Setup</button>
           <button class="btn sm-btn" :class="{ active: activeTab === 'assistant' }" @click="activeTab = 'assistant'" :style="activeTab === 'assistant' ? 'background: var(--text-color, #201d1d); color: var(--bg-color, #fdfcfc);' : ''">Glabel Assistant</button>
@@ -146,11 +147,6 @@ const loadProjects = async () => {
 
 const openProject = (id) => {
   router.push(`/project/${id}`)
-}
-
-const submitQuickTask = (typeEnum, description) => {
-  newProjectForm.value.task_type = typeEnum
-  submitNewProject(description)
 }
 
 const submitNewProject = async (taskType = 'Generated Pipeline') => {
@@ -310,39 +306,6 @@ h3 {
   margin: 0;
   border: none;
   padding: 0;
-}
-
-.modal-split {
-  display: flex;
-  gap: 2rem;
-}
-
-.modal-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-textarea {
-  flex: 1;
-  min-height: 150px;
-  background: transparent;
-  border: 1px solid var(--border-color, #646262);
-  color: var(--text-color, #201d1d);
-  font-family: 'Berkeley Mono', monospace;
-  padding: 0.5rem;
-  resize: vertical;
-}
-
-textarea:focus {
-  outline: 1px solid var(--text-color, #201d1d);
-}
-
-.task-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.5rem;
 }
 
 .austere-input {
