@@ -44,6 +44,24 @@ const isPanning = ref(false)
 const isSpaceDown = ref(false)
 const lastMousePos = ref({ x: 0, y: 0 })
 
+const draftPolygon = ref(null)
+const cursorPos = ref({ x: 0, y: 0 })
+
+const draggedNode = ref(null)
+
+const COCO_KEYPOINTS = [
+  'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
+  'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+  'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
+  'left_knee', 'right_knee', 'left_ankle', 'right_ankle'
+]
+
+const COCO_EDGES = [
+  [15, 13], [13, 11], [16, 14], [14, 12], [11, 12], [5, 11], [6, 12], [5, 6],
+  [5, 7], [6, 8], [7, 9], [8, 10], [1, 2], [0, 1], [0, 2], [1, 3], [2, 4],
+  [3, 5], [4, 6]
+]
+
 const handleKeydown = (e) => {
   if (e.code === 'Space') {
     isSpaceDown.value = true
@@ -112,7 +130,31 @@ const handleMouseDown = (e) => {
       classId: activeClass.value.id,
       color: activeClass.value.color || '#00ff00'
     }
+  } else if (e.button === 0 && activeTool.value === 'draw_polygon' && zoomContainerRef.value) {
+    if (!activeClass.value) {
+      alert("Please select a class first.")
+      return
+    }
+    const rect = zoomContainerRef.value.getBoundingClientRect()
+    const svgX = (e.clientX - rect.left) / zoomScale.value
+    const svgY = (e.clientY - rect.top) / zoomScale.value
+
+    if (!draftPolygon.value) {
+      draftPolygon.value = {
+        classId: activeClass.value.id,
+        color: activeClass.value.color || '#00ff00',
+        points: []
+      }
+    }
+    draftPolygon.value.points.push({ x: svgX, y: svgY })
+    cursorPos.value = { x: svgX, y: svgY }
   }
+}
+
+const startDragNode = (e, skelIdx, nodeIdx) => {
+  if (e.button !== 0 || activeTool.value !== 'select') return
+  draggedNode.value = { skelIdx, nodeIdx }
+  e.preventDefault()
 }
 
 const handleMouseMove = (e) => {
@@ -122,7 +164,16 @@ const handleMouseMove = (e) => {
     pan.value.x += dx
     pan.value.y += dy
     lastMousePos.value = { x: e.clientX, y: e.clientY }
-  } else if (isDrawing.value && zoomContainerRef.value) {
+  } else if (draggedNode.value && zoomContainerRef.value && selectedImage.value?.annotations?.skeletons) {
+    const rect = zoomContainerRef.value.getBoundingClientRect()
+    const currentX = (e.clientX - rect.left) / zoomScale.value
+    const currentY = (e.clientY - rect.top) / zoomScale.value
+    
+    const { skelIdx, nodeIdx } = draggedNode.value
+    const skeleton = selectedImage.value.annotations.skeletons[skelIdx]
+    skeleton.keypoints[nodeIdx].x = currentX
+    skeleton.keypoints[nodeIdx].y = currentY
+  } else if (isDrawing.value && zoomContainerRef.value && activeTool.value === 'draw_bbox') {
     const rect = zoomContainerRef.value.getBoundingClientRect()
     const currentX = (e.clientX - rect.left) / zoomScale.value
     const currentY = (e.clientY - rect.top) / zoomScale.value
@@ -131,12 +182,19 @@ const handleMouseMove = (e) => {
     draftBBox.value.y = Math.min(draftBBox.value.startY, currentY)
     draftBBox.value.width = Math.abs(currentX - draftBBox.value.startX)
     draftBBox.value.height = Math.abs(currentY - draftBBox.value.startY)
+  } else if (draftPolygon.value && activeTool.value === 'draw_polygon' && zoomContainerRef.value) {
+    const rect = zoomContainerRef.value.getBoundingClientRect()
+    cursorPos.value.x = (e.clientX - rect.left) / zoomScale.value
+    cursorPos.value.y = (e.clientY - rect.top) / zoomScale.value
   }
 }
 
 const handleMouseUp = () => {
   isPanning.value = false
-  if (isDrawing.value) {
+  if (draggedNode.value) {
+    draggedNode.value = null
+  }
+  if (isDrawing.value && activeTool.value === 'draw_bbox') {
     if (draftBBox.value && draftBBox.value.width > 5 && draftBBox.value.height > 5) {
       if (!selectedImage.value.annotations) {
         selectedImage.value.annotations = {}
@@ -150,6 +208,21 @@ const handleMouseUp = () => {
     }
     isDrawing.value = false
     draftBBox.value = null
+  }
+}
+
+const handleDblClick = (e) => {
+  if (activeTool.value === 'draw_polygon' && draftPolygon.value) {
+    if (draftPolygon.value.points.length >= 3) {
+      if (!selectedImage.value.annotations) {
+        selectedImage.value.annotations = {}
+      }
+      if (!selectedImage.value.annotations.polygons) {
+        selectedImage.value.annotations.polygons = []
+      }
+      selectedImage.value.annotations.polygons.push(draftPolygon.value)
+    }
+    draftPolygon.value = null
   }
 }
 
@@ -218,22 +291,51 @@ const mockClassify = (className) => {
   }
 }
 
-const mockDrawBoundingBox = () => {
-  if (selectedImage.value) {
-    selectedImage.value.annotations = { bboxes: [[10, 10, 100, 100]] }
+const spawnSkeleton = () => {
+  if (!activeClass.value) {
+    alert("Please select a class first.")
+    return
   }
-}
+  if (!selectedImage.value) return
+  
+  if (!selectedImage.value.annotations) selectedImage.value.annotations = {}
+  if (!selectedImage.value.annotations.skeletons) selectedImage.value.annotations.skeletons = []
 
-const mockDrawPolygon = () => {
-  if (selectedImage.value) {
-    selectedImage.value.annotations = { polygon: true }
+  let centerX = 100
+  let centerY = 100
+  
+  if (zoomContainerRef.value) {
+    const parentRect = zoomContainerRef.value.parentElement.getBoundingClientRect()
+    const viewCenterX = parentRect.width / 2
+    const viewCenterY = parentRect.height / 2
+    centerX = (viewCenterX - pan.value.x) / zoomScale.value
+    centerY = (viewCenterY - pan.value.y) / zoomScale.value
   }
-}
 
-const mockDrawSkeleton = () => {
-  if (selectedImage.value) {
-    selectedImage.value.annotations = { skeleton: true }
-  }
+  const spread = 50 / zoomScale.value
+  
+  const keypoints = COCO_KEYPOINTS.map((name) => {
+    let offsetX = (Math.random() - 0.5) * spread
+    let offsetY = (Math.random() - 0.5) * spread
+    
+    if (name.includes('left')) offsetX -= spread
+    if (name.includes('right')) offsetX += spread
+    if (name.includes('knee') || name.includes('ankle')) offsetY += spread * 2
+    if (name.includes('eye') || name.includes('ear') || name.includes('nose')) offsetY -= spread * 2
+    
+    return {
+      x: centerX + offsetX,
+      y: centerY + offsetY,
+      name,
+      visible: true
+    }
+  })
+
+  selectedImage.value.annotations.skeletons.push({
+    classId: activeClass.value.id,
+    color: activeClass.value.color || '#00ff00',
+    keypoints
+  })
 }
 
 const saveAnnotation = async () => {
@@ -301,11 +403,13 @@ const saveAnnotation = async () => {
           </template>
           
           <template v-else-if="project.task_type === 'segmentation'">
-            <button class="tool-btn" @click="mockDrawPolygon()">Mock Draw Polygon</button>
+            <button class="tool-btn" :class="{ active: activeTool === 'select' }" @click="activeTool = 'select'">Select</button>
+            <button class="tool-btn" :class="{ active: activeTool === 'draw_polygon' }" @click="activeTool = 'draw_polygon'">Draw Polygon</button>
           </template>
           
           <template v-else-if="project.task_type === 'pose_estimation'">
-            <button class="tool-btn" @click="mockDrawSkeleton()">Mock Draw Skeleton</button>
+            <button class="tool-btn" :class="{ active: activeTool === 'select' }" @click="activeTool = 'select'">Select</button>
+            <button class="tool-btn" @click="spawnSkeleton">Spawn Skeleton</button>
           </template>
           
           <div class="spacer"></div>
@@ -319,6 +423,7 @@ const saveAnnotation = async () => {
           @mousemove="handleMouseMove"
           @mouseup="handleMouseUp"
           @mouseleave="handleMouseUp"
+          @dblclick="handleDblClick"
           @contextmenu.prevent
         >
           <div 
@@ -349,11 +454,61 @@ const saveAnnotation = async () => {
                   fill="rgba(255, 255, 255, 0.2)" :stroke="draftBBox.color" stroke-width="2" stroke-dasharray="4"
                 />
               </template>
+              <template v-if="selectedImage.annotations?.polygons">
+                <g v-for="(poly, idx) in selectedImage.annotations.polygons" :key="'poly-'+idx">
+                  <polygon 
+                    :points="poly.points.map(p => `${p.x},${p.y}`).join(' ')"
+                    fill="rgba(255, 255, 255, 0.2)" :stroke="poly.color" stroke-width="2"
+                  />
+                  <text 
+                    v-if="poly.points.length > 0"
+                    :x="poly.points[0].x" :y="poly.points[0].y - 4" :fill="poly.color" font-size="12" font-family="sans-serif">
+                    {{ projectClasses.find(c => c.id === poly.classId)?.name || 'Unknown' }}
+                  </text>
+                </g>
+              </template>
+              <template v-if="draftPolygon">
+                <polyline 
+                  :points="draftPolygon.points.map(p => `${p.x},${p.y}`).join(' ')"
+                  fill="none" :stroke="draftPolygon.color" stroke-width="2" stroke-dasharray="4"
+                />
+                <line 
+                  v-if="draftPolygon.points.length > 0"
+                  :x1="draftPolygon.points[draftPolygon.points.length - 1].x" 
+                  :y1="draftPolygon.points[draftPolygon.points.length - 1].y"
+                  :x2="cursorPos.x" 
+                  :y2="cursorPos.y"
+                  :stroke="draftPolygon.color" stroke-width="2" stroke-dasharray="4"
+                />
+                <circle 
+                  v-for="(p, i) in draftPolygon.points" :key="'dp-'+i"
+                  :cx="p.x" :cy="p.y" r="3" :fill="draftPolygon.color"
+                />
+              </template>
+              <template v-if="selectedImage.annotations?.skeletons">
+                <g v-for="(skel, sIdx) in selectedImage.annotations.skeletons" :key="'skel-'+sIdx">
+                  <line
+                    v-for="(edge, eIdx) in COCO_EDGES" :key="'edge-'+eIdx"
+                    :x1="skel.keypoints[edge[0]].x" :y1="skel.keypoints[edge[0]].y"
+                    :x2="skel.keypoints[edge[1]].x" :y2="skel.keypoints[edge[1]].y"
+                    :stroke="skel.color" stroke-width="2"
+                  />
+                  <circle
+                    v-for="(kp, nIdx) in skel.keypoints" :key="'kp-'+nIdx"
+                    :cx="kp.x" :cy="kp.y" r="4" :fill="skel.color"
+                    class="skeleton-node"
+                    @mousedown.stop="startDragNode($event, sIdx, nIdx)"
+                  />
+                  <text 
+                    v-if="skel.keypoints.length > 0"
+                    :x="skel.keypoints[0].x" :y="skel.keypoints[0].y - 10" :fill="skel.color" font-size="12" font-family="sans-serif">
+                    {{ projectClasses.find(c => c.id === skel.classId)?.name || 'Unknown' }}
+                  </text>
+                </g>
+              </template>
             </svg>
             
-            <!-- Mock Overlays (removed the old mock-bbox) -->
-            <div v-if="selectedImage.annotations?.polygon" class="mock-overlay" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #00ff00; font-weight: bold; font-size: 24px; text-shadow: 1px 1px 2px black;">[Mock Polygon]</div>
-            <div v-if="selectedImage.annotations?.skeleton" class="mock-overlay" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #00ff00; font-weight: bold; font-size: 24px; text-shadow: 1px 1px 2px black;">[Mock Skeleton]</div>
+            <!-- Mock Overlays -->
             <div v-if="selectedImage.annotations?.class" class="mock-class" style="position: absolute; left: 10px; top: 10px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px;">Class: {{ selectedImage.annotations.class }}</div>
           </div>
         </div>
@@ -608,6 +763,11 @@ const saveAnnotation = async () => {
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+.skeleton-node {
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .debug-panel {
