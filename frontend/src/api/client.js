@@ -83,7 +83,7 @@ export function assignDatasetAssets(projectId, assetIds) {
 }
 
 export function saveAssetAnnotations(projectId, assetId, annotations, status) {
-  return request(\/api/v1/projects/\/dataset/assets/\/annotations\, {
+  return request(`/api/v1/projects/${projectId}/dataset/assets/${assetId}/annotations`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ annotations, status })
