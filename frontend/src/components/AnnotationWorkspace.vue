@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { updateProject } from '../api/client.js'
 
 const props = defineProps({
@@ -28,6 +28,85 @@ const annotatedAssets = computed(() => props.assets.filter(a => a.status === 'an
 const currentList = computed(() => activeTab.value === 'unannotated' ? unannotatedAssets.value : annotatedAssets.value)
 
 const selectedImage = ref(null)
+
+const zoomScale = ref(1)
+const pan = ref({ x: 0, y: 0 })
+const MIN_ZOOM = 0.1
+const MAX_ZOOM = 10
+
+const isPanning = ref(false)
+const isSpaceDown = ref(false)
+const lastMousePos = ref({ x: 0, y: 0 })
+
+const handleKeydown = (e) => {
+  if (e.code === 'Space') {
+    isSpaceDown.value = true
+    if (e.target === document.body) {
+      e.preventDefault()
+    }
+  }
+}
+
+const handleKeyup = (e) => {
+  if (e.code === 'Space') {
+    isSpaceDown.value = false
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('keyup', handleKeyup)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('keyup', handleKeyup)
+})
+
+const handleWheel = (e) => {
+  e.preventDefault()
+  const zoomSensitivity = 0.001
+  const delta = e.deltaY * -zoomSensitivity
+  const newScale = Math.min(Math.max(zoomScale.value * (1 + delta), MIN_ZOOM), MAX_ZOOM)
+  
+  const scaleRatio = newScale / zoomScale.value
+  
+  const containerRect = e.currentTarget.getBoundingClientRect()
+  const mouseX = e.clientX - containerRect.left
+  const mouseY = e.clientY - containerRect.top
+  
+  pan.value.x = mouseX - (mouseX - pan.value.x) * scaleRatio
+  pan.value.y = mouseY - (mouseY - pan.value.y) * scaleRatio
+  
+  zoomScale.value = newScale
+}
+
+const handleMouseDown = (e) => {
+  if (e.button === 1 || (e.button === 0 && isSpaceDown.value)) {
+    e.preventDefault()
+    isPanning.value = true
+    lastMousePos.value = { x: e.clientX, y: e.clientY }
+  }
+}
+
+const handleMouseMove = (e) => {
+  if (isPanning.value) {
+    const dx = e.clientX - lastMousePos.value.x
+    const dy = e.clientY - lastMousePos.value.y
+    pan.value.x += dx
+    pan.value.y += dy
+    lastMousePos.value = { x: e.clientX, y: e.clientY }
+  }
+}
+
+const handleMouseUp = () => {
+  isPanning.value = false
+}
+
+const resetView = () => {
+  zoomScale.value = 1
+  pan.value = { x: 0, y: 0 }
+}
 
 const newClassName = ref('')
 const projectClasses = ref([...(props.project.classes || [])])
@@ -147,6 +226,7 @@ const saveAnnotation = () => {
     <div class="canvas-area">
       <div v-if="selectedImage" class="editor-container">
         <div class="toolbar">
+          <button class="tool-btn" @click="resetView">Reset View</button>
           <span class="task-badge">{{ project.task_type }}</span>
           
           <template v-if="project.task_type === 'classification'">
@@ -170,14 +250,31 @@ const saveAnnotation = () => {
           <button class="primary-btn" @click="saveAnnotation">Save Annotation</button>
         </div>
         
-        <div class="image-container">
-          <img :src="getImageUrl(selectedImage)" alt="Asset" class="canvas-image" />
-          
-          <!-- Mock Overlays -->
-          <div v-if="selectedImage.annotations?.bboxes" class="mock-bbox" style="position: absolute; border: 2px solid #00ff00; left: 10px; top: 10px; width: 100px; height: 100px; box-shadow: 0 0 0 1px rgba(0,0,0,0.5);"></div>
-          <div v-if="selectedImage.annotations?.polygon" class="mock-overlay" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #00ff00; font-weight: bold; font-size: 24px; text-shadow: 1px 1px 2px black;">[Mock Polygon]</div>
-          <div v-if="selectedImage.annotations?.skeleton" class="mock-overlay" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #00ff00; font-weight: bold; font-size: 24px; text-shadow: 1px 1px 2px black;">[Mock Skeleton]</div>
-          <div v-if="selectedImage.annotations?.class" class="mock-class" style="position: absolute; left: 10px; top: 10px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px;">Class: {{ selectedImage.annotations.class }}</div>
+        <div 
+          class="image-container"
+          @wheel="handleWheel"
+          @mousedown="handleMouseDown"
+          @mousemove="handleMouseMove"
+          @mouseup="handleMouseUp"
+          @mouseleave="handleMouseUp"
+          @contextmenu.prevent
+        >
+          <div 
+            class="zoom-container"
+            :style="{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomScale})`,
+              transformOrigin: '0 0'
+            }"
+          >
+            <img :src="getImageUrl(selectedImage)" alt="Asset" class="canvas-image" draggable="false" />
+            <svg class="annotation-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+            
+            <!-- Mock Overlays -->
+            <div v-if="selectedImage.annotations?.bboxes" class="mock-bbox" style="position: absolute; border: 2px solid #00ff00; left: 10px; top: 10px; width: 100px; height: 100px; box-shadow: 0 0 0 1px rgba(0,0,0,0.5);"></div>
+            <div v-if="selectedImage.annotations?.polygon" class="mock-overlay" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #00ff00; font-weight: bold; font-size: 24px; text-shadow: 1px 1px 2px black;">[Mock Polygon]</div>
+            <div v-if="selectedImage.annotations?.skeleton" class="mock-overlay" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #00ff00; font-weight: bold; font-size: 24px; text-shadow: 1px 1px 2px black;">[Mock Skeleton]</div>
+            <div v-if="selectedImage.annotations?.class" class="mock-class" style="position: absolute; left: 10px; top: 10px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px;">Class: {{ selectedImage.annotations.class }}</div>
+          </div>
         </div>
         
         <div class="debug-panel">
@@ -393,17 +490,38 @@ const saveAnnotation = () => {
 .image-container {
   flex-grow: 1;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
   background: #111;
+  cursor: grab;
+}
+
+.image-container:active {
+  cursor: grabbing;
+}
+
+.zoom-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .canvas-image {
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  pointer-events: none;
+  display: block;
+}
+
+.annotation-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .debug-panel {
