@@ -25,6 +25,20 @@ export function getProject(projectId) {
   return request(`/api/v1/projects/${projectId}`)
 }
 
+export function updateProject(projectId, payload) {
+  return request(`/api/v1/projects/${projectId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+}
+
+export function deleteProject(projectId) {
+  return request(`/api/v1/projects/${projectId}`, {
+    method: 'DELETE'
+  })
+}
+
 export function listDatasetAssets(projectId, status) {
   const query = status ? `?status=${encodeURIComponent(status)}` : ''
   return request(`/api/v1/projects/${projectId}/dataset/assets${query}`)

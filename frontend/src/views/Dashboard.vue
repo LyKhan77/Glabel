@@ -3,7 +3,7 @@
     <header class="header">
       <h1>[Glabel]</h1>
       <p>Open Vision Studio</p>
-      <button class="btn action-btn" @click="showModal = true">
+      <button class="btn action-btn" @click="openNewModal">
         <span class="icon">[+]</span> New Project
       </button>
     </header>
@@ -16,8 +16,14 @@
         <div v-else-if="openVisionProjects.length === 0" class="empty-state">No projects yet.</div>
         <div v-else class="projects-grid">
           <div class="project-card" v-for="project in openVisionProjects" :key="project.id" @click="openProject(project.id)">
-            <h3>{{ project.name }}</h3>
-            <p class="path">{{ project.description }}</p>
+            <div class="card-content">
+              <h3>{{ project.name }}</h3>
+              <p class="path">Task: {{ project.task_type }}</p>
+            </div>
+            <div class="card-actions">
+              <button class="btn sm-btn" @click.stop="openEditModal(project)">Edit</button>
+              <button class="btn sm-btn" @click.stop="handleDeleteProject(project.id)" style="color: #8a1f11; border-color: #8a1f11;">Del</button>
+            </div>
           </div>
         </div>
       </section>
@@ -27,24 +33,24 @@
     <div v-if="showModal" class="modal-overlay">
       <div class="modal-content">
         <div class="modal-header">
-          <h2>Create New Project</h2>
+          <h2>{{ isEditing ? 'Edit Project' : 'Create New Project' }}</h2>
           <button class="btn sm-btn" @click="showModal = false">[x] Close</button>
         </div>
         <div v-if="errorMessage" class="empty-state error-state" style="margin-bottom: 1rem; padding: 0.5rem; background: #ffebeb; border: 1px solid #8a1f11;">{{ errorMessage }}</div>
-        <div class="tabs" style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color, #646262); padding-bottom: 0.5rem;">
+        <div v-if="!isEditing" class="tabs" style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color, #646262); padding-bottom: 0.5rem;">
           <button class="btn sm-btn" :class="{ active: activeTab === 'manual' }" @click="activeTab = 'manual'" style="margin-right: 0.5rem;" :style="activeTab === 'manual' ? 'background: var(--text-color, #201d1d); color: var(--bg-color, #fdfcfc);' : ''">Manual Setup</button>
           <button class="btn sm-btn" :class="{ active: activeTab === 'assistant' }" @click="activeTab = 'assistant'" :style="activeTab === 'assistant' ? 'background: var(--text-color, #201d1d); color: var(--bg-color, #fdfcfc);' : ''">Glabel Assistant</button>
         </div>
 
         <!-- Manual Setup Tab -->
-        <div v-if="activeTab === 'manual'">
+        <div v-if="activeTab === 'manual' || isEditing">
           <div style="margin-bottom: 1rem;">
             <input v-model="newProjectForm.name" type="text" placeholder="Project Name" class="austere-input" />
           </div>
           <div style="margin-bottom: 1rem;">
             <label>
               Task Type:
-              <select v-model="newProjectForm.task_type" class="austere-input">
+              <select v-model="newProjectForm.task_type" class="austere-input" :disabled="isEditing">
                 <option value="classification">Classification</option>
                 <option value="object_detection">Object Detection</option>
                 <option value="segmentation">Segmentation</option>
@@ -52,7 +58,7 @@
               </select>
             </label>
           </div>
-          <button class="btn" @click="submitNewProject()">Create Project</button>
+          <button class="btn" @click="submitNewProject()">{{ isEditing ? 'Update Project' : 'Create Project' }}</button>
         </div>
 
         <!-- Assistant Tab -->
@@ -90,12 +96,14 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { createProject, listProjects } from '../api/client'
+import { createProject, listProjects, updateProject, deleteProject } from '../api/client'
 import { askGlabelAssistant } from '../api/llmService'
 
 const router = useRouter()
 
 const showModal = ref(false)
+const isEditing = ref(false)
+const editingProjectId = ref(null)
 const newProjectForm = ref({ name: '', task_type: 'object_detection' })
 const errorMessage = ref('')
 const isLoading = ref(false)
@@ -145,20 +153,58 @@ const openProject = (id) => {
   router.push(`/project/${id}`)
 }
 
+const openNewModal = () => {
+  isEditing.value = false
+  editingProjectId.value = null
+  newProjectForm.value = { name: '', task_type: 'object_detection' }
+  activeTab.value = 'manual'
+  showModal.value = true
+}
+
+const openEditModal = (project) => {
+  isEditing.value = true
+  editingProjectId.value = project.id
+  newProjectForm.value = { name: project.name, task_type: project.task_type }
+  activeTab.value = 'manual'
+  showModal.value = true
+}
+
+const handleDeleteProject = async (id) => {
+  if (confirm('Are you sure you want to delete this workspace?')) {
+    try {
+      await deleteProject(id)
+      await loadProjects()
+    } catch (e) {
+      errorMessage.value = 'Failed to delete project.'
+    }
+  }
+}
+
 const submitNewProject = async () => {
   errorMessage.value = ''
   const nameToUse = newProjectForm.value.name.trim() || newProjectForm.value.task_type
   try {
-    const project = await createProject({
-      name: nameToUse,
-      description: "",
-      task_type: newProjectForm.value.task_type
-    })
-    showModal.value = false
-    newProjectForm.value = { name: '', task_type: 'object_detection' }
-    router.push(`/project/${project.id}`)
+    if (isEditing.value) {
+      await updateProject(editingProjectId.value, {
+        name: nameToUse
+      })
+      showModal.value = false
+      isEditing.value = false
+      editingProjectId.value = null
+      newProjectForm.value = { name: '', task_type: 'object_detection' }
+      await loadProjects()
+    } else {
+      const project = await createProject({
+        name: nameToUse,
+        description: "",
+        task_type: newProjectForm.value.task_type
+      })
+      showModal.value = false
+      newProjectForm.value = { name: '', task_type: 'object_detection' }
+      router.push(`/project/${project.id}`)
+    }
   } catch (error) {
-    errorMessage.value = 'Could not create project. Check backend status.'
+    errorMessage.value = 'Could not save project. Check backend status.'
   }
 }
 
@@ -228,6 +274,18 @@ h3 {
   padding: 1rem;
   cursor: pointer;
   background-color: transparent;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-content {
+  flex: 1;
+}
+
+.card-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .project-card:hover {
