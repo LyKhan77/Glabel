@@ -81,3 +81,11 @@ export function assignDatasetAssets(projectId, assetIds) {
     body: JSON.stringify({ asset_ids: assetIds })
   })
 }
+
+export function saveAssetAnnotations(projectId, assetId, annotations, status) {
+  return request(\/api/v1/projects/\/dataset/assets/\/annotations\, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ annotations, status })
+  })
+}

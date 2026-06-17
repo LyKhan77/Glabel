@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { updateProject } from '../api/client.js'
+import { saveAssetAnnotations } from '../api/client.js'
 
 const props = defineProps({
   project: {
@@ -28,6 +29,11 @@ const annotatedAssets = computed(() => props.assets.filter(a => a.status === 'an
 const currentList = computed(() => activeTab.value === 'unannotated' ? unannotatedAssets.value : annotatedAssets.value)
 
 const selectedImage = ref(null)
+
+const activeTool = ref('select')
+const isDrawing = ref(false)
+const draftBBox = ref(null)
+const zoomContainerRef = ref(null)
 
 const zoomScale = ref(1)
 const pan = ref({ x: 0, y: 0 })
@@ -82,10 +88,30 @@ const handleWheel = (e) => {
 }
 
 const handleMouseDown = (e) => {
-  if (e.button === 1 || (e.button === 0 && isSpaceDown.value)) {
+  if (e.button === 1 || (e.button === 0 && isSpaceDown.value) || (e.button === 0 && activeTool.value === 'select')) {
     e.preventDefault()
     isPanning.value = true
     lastMousePos.value = { x: e.clientX, y: e.clientY }
+  } else if (e.button === 0 && activeTool.value === 'draw_bbox' && zoomContainerRef.value) {
+    if (!activeClass.value) {
+      alert("Please select a class first.")
+      return
+    }
+    const rect = zoomContainerRef.value.getBoundingClientRect()
+    const svgX = (e.clientX - rect.left) / zoomScale.value
+    const svgY = (e.clientY - rect.top) / zoomScale.value
+    
+    isDrawing.value = true
+    draftBBox.value = {
+      startX: svgX,
+      startY: svgY,
+      x: svgX,
+      y: svgY,
+      width: 0,
+      height: 0,
+      classId: activeClass.value.id,
+      color: activeClass.value.color || '#00ff00'
+    }
   }
 }
 
@@ -96,11 +122,35 @@ const handleMouseMove = (e) => {
     pan.value.x += dx
     pan.value.y += dy
     lastMousePos.value = { x: e.clientX, y: e.clientY }
+  } else if (isDrawing.value && zoomContainerRef.value) {
+    const rect = zoomContainerRef.value.getBoundingClientRect()
+    const currentX = (e.clientX - rect.left) / zoomScale.value
+    const currentY = (e.clientY - rect.top) / zoomScale.value
+    
+    draftBBox.value.x = Math.min(draftBBox.value.startX, currentX)
+    draftBBox.value.y = Math.min(draftBBox.value.startY, currentY)
+    draftBBox.value.width = Math.abs(currentX - draftBBox.value.startX)
+    draftBBox.value.height = Math.abs(currentY - draftBBox.value.startY)
   }
 }
 
 const handleMouseUp = () => {
   isPanning.value = false
+  if (isDrawing.value) {
+    if (draftBBox.value && draftBBox.value.width > 5 && draftBBox.value.height > 5) {
+      if (!selectedImage.value.annotations) {
+        selectedImage.value.annotations = {}
+      }
+      if (!selectedImage.value.annotations.bboxes) {
+        selectedImage.value.annotations.bboxes = []
+      }
+      
+      const { startX, startY, ...finalBBox } = draftBBox.value
+      selectedImage.value.annotations.bboxes.push(finalBBox)
+    }
+    isDrawing.value = false
+    draftBBox.value = null
+  }
 }
 
 const resetView = () => {
@@ -186,11 +236,22 @@ const mockDrawSkeleton = () => {
   }
 }
 
-const saveAnnotation = () => {
+const saveAnnotation = async () => {
   if (selectedImage.value) {
-    selectedImage.value.status = 'annotated'
-    console.log('Saved annotations:', selectedImage.value.annotations)
-    activeTab.value = 'annotated'
+    try {
+      const updatedAsset = await saveAssetAnnotations(
+        props.project.id, 
+        selectedImage.value.id, 
+        selectedImage.value.annotations || {}, 
+        'annotated'
+      )
+      selectedImage.value.status = 'annotated'
+      console.log('Saved annotations:', updatedAsset.annotations)
+      activeTab.value = 'annotated'
+    } catch (e) {
+      console.error('Failed to save annotations:', e)
+      alert('Failed to save annotations')
+    }
   }
 }
 </script>
@@ -235,7 +296,8 @@ const saveAnnotation = () => {
           </template>
           
           <template v-else-if="project.task_type === 'object_detection'">
-            <button class="tool-btn" @click="mockDrawBoundingBox()">Mock Draw BBox</button>
+            <button class="tool-btn" :class="{ active: activeTool === 'select' }" @click="activeTool = 'select'">Select</button>
+            <button class="tool-btn" :class="{ active: activeTool === 'draw_bbox' }" @click="activeTool = 'draw_bbox'">Draw BBox</button>
           </template>
           
           <template v-else-if="project.task_type === 'segmentation'">
@@ -261,16 +323,35 @@ const saveAnnotation = () => {
         >
           <div 
             class="zoom-container"
+            ref="zoomContainerRef"
             :style="{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomScale})`,
               transformOrigin: '0 0'
             }"
           >
             <img :src="getImageUrl(selectedImage)" alt="Asset" class="canvas-image" draggable="false" />
-            <svg class="annotation-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+            <svg class="annotation-svg" xmlns="http://www.w3.org/2000/svg">
+              <template v-if="selectedImage.annotations?.bboxes">
+                <g v-for="(bbox, idx) in selectedImage.annotations.bboxes" :key="idx">
+                  <rect 
+                    :x="bbox.x" :y="bbox.y" :width="bbox.width" :height="bbox.height" 
+                    fill="transparent" :stroke="bbox.color" stroke-width="2" 
+                  />
+                  <text 
+                    :x="bbox.x" :y="bbox.y - 4" :fill="bbox.color" font-size="12" font-family="sans-serif">
+                    {{ projectClasses.find(c => c.id === bbox.classId)?.name || 'Unknown' }}
+                  </text>
+                </g>
+              </template>
+              <template v-if="draftBBox">
+                <rect 
+                  :x="draftBBox.x" :y="draftBBox.y" :width="draftBBox.width" :height="draftBBox.height" 
+                  fill="rgba(255, 255, 255, 0.2)" :stroke="draftBBox.color" stroke-width="2" stroke-dasharray="4"
+                />
+              </template>
+            </svg>
             
-            <!-- Mock Overlays -->
-            <div v-if="selectedImage.annotations?.bboxes" class="mock-bbox" style="position: absolute; border: 2px solid #00ff00; left: 10px; top: 10px; width: 100px; height: 100px; box-shadow: 0 0 0 1px rgba(0,0,0,0.5);"></div>
+            <!-- Mock Overlays (removed the old mock-bbox) -->
             <div v-if="selectedImage.annotations?.polygon" class="mock-overlay" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #00ff00; font-weight: bold; font-size: 24px; text-shadow: 1px 1px 2px black;">[Mock Polygon]</div>
             <div v-if="selectedImage.annotations?.skeleton" class="mock-overlay" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #00ff00; font-weight: bold; font-size: 24px; text-shadow: 1px 1px 2px black;">[Mock Skeleton]</div>
             <div v-if="selectedImage.annotations?.class" class="mock-class" style="position: absolute; left: 10px; top: 10px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px;">Class: {{ selectedImage.annotations.class }}</div>
@@ -472,6 +553,11 @@ const saveAnnotation = () => {
 
 .tool-btn:hover {
   background: rgba(0,0,0,0.05);
+}
+
+.tool-btn.active {
+  background: var(--text-color, #201d1d);
+  color: var(--bg-color, #fdfcfc);
 }
 
 .primary-btn {

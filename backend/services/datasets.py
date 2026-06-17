@@ -226,3 +226,16 @@ def _extract_frames(project_id: str, video_path: Path, source_asset_id: str, ext
         capture.release()
 
     return frame_assets
+def update_annotations(project_id: str, asset_id: str, annotations: dict, status: str) -> dict | None:
+    timestamp = _now()
+    
+    def mut(assets):
+        for asset in assets:
+            if asset["id"] == asset_id:
+                asset["annotations"] = annotations
+                asset["status"] = status
+                asset["updated_at"] = timestamp
+                return asset
+        return None
+        
+    return update_json(_assets_file(project_id), [], mut)

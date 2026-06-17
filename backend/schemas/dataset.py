@@ -46,3 +46,6 @@ class DatasetVersion(BaseModel):
     multiplier: int
     asset_count: int
     created_at: str
+class AssetAnnotationsUpdate(BaseModel):
+    annotations: dict
+    status: str

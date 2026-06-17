@@ -161,3 +161,23 @@ def test_assign_assets_updates_status(client, project_id):
 
     listed = client.get(f"/api/v1/projects/{project_id}/dataset/assets")
     assert listed.json()[0]["status"] == "unannotated"
+def test_update_asset_annotations(client, project_id):
+    _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
+    uploaded = client.post(
+        f"/api/v1/projects/{project_id}/dataset/upload",
+        files={"files": ("sample.png", encoded.tobytes(), "image/png")},
+    )
+    asset_id = uploaded.json()["assets"][0]["id"]
+
+    updated = client.put(
+        f"/api/v1/projects/{project_id}/dataset/assets/{asset_id}/annotations",
+        json={"annotations": {"bboxes": [{"x": 10, "y": 10, "width": 100, "height": 100, "classId": "test", "color": "#00ff00"}]}, "status": "annotated"},
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["status"] == "annotated"
+    assert "bboxes" in updated.json()["annotations"]
+    
+    listed = client.get(f"/api/v1/projects/{project_id}/dataset/assets")
+    assert listed.json()[0]["status"] == "annotated"
+    assert "bboxes" in listed.json()[0]["annotations"]

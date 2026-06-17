@@ -8,6 +8,7 @@ from backend.schemas.dataset import (
     DatasetUploadResponse,
     DatasetVersion,
     VersionCreate,
+    AssetAnnotationsUpdate,
 )
 from backend.services import datasets as svc
 
@@ -76,3 +77,14 @@ def create_version(project_id: str, payload: VersionCreate):
     if version is None:
         raise HTTPException(status_code=404, detail="Project not found")
     return version
+
+@router.put("/dataset/assets/{asset_id}/annotations", response_model=DatasetAsset)
+def update_asset_annotations(project_id: str, asset_id: str, payload: AssetAnnotationsUpdate):
+    if not svc.project_exists(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    asset = svc.update_annotations(project_id, asset_id, payload.annotations, payload.status)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    return asset
