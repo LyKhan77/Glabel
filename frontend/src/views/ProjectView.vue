@@ -11,12 +11,14 @@ import {
   listDatasetVersions,
   uploadDatasetFiles
 } from '../api/client'
+import AnnotationWorkspace from '../components/AnnotationWorkspace.vue'
 
 const router = useRouter()
 const route = useRoute()
 const projectId = computed(() => route.params.id)
 
 const activeTab = ref('dataset') // 'dataset', 'versions', 'train'
+const isAnnotating = ref(false)
 const project = ref(null)
 const assets = ref([])
 const errorMessage = ref('')
@@ -63,7 +65,7 @@ const assignSelected = async () => {
 }
 
 const openAnnotationWorkspace = () => {
-  console.log('Open annotation workspace')
+  isAnnotating.value = true
 }
 
 const goBack = () => {
@@ -206,7 +208,13 @@ onMounted(loadProject)
           </div>
         </div>
 
-        <div class="split-view">
+        <AnnotationWorkspace 
+          v-if="isAnnotating"
+          :project="project"
+          :assets="annotatingImages"
+          @close="isAnnotating = false"
+        />
+        <div v-else class="split-view">
           <div class="pane left-pane">
             <div class="pane-header">
               <h3>Unassigned ({{ unassignedImages.length }})</h3>
