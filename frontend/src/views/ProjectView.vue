@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  API_BASE_URL,
   autoAnnotateDataset,
   createDatasetVersion,
   getProject,
@@ -21,11 +22,12 @@ const errorMessage = ref('')
 const isLoading = ref(false)
 
 // Dataset state
-const datasetState = ref('unannotated') // 'unannotated', 'annotated'
 const fpsSlider = ref(2)
 const isDragging = ref(false)
 const showUploadModal = ref(false)
 const fileInput = ref(null)
+
+const selectedUnassigned = ref([])
 
 const onDragOver = (e) => { e.preventDefault(); isDragging.value = true }
 const onDragLeave = (e) => { e.preventDefault(); isDragging.value = false }
@@ -35,8 +37,30 @@ const onDrop = (e) => {
   uploadFiles(Array.from(e.dataTransfer.files))
 }
 
-const unannotatedImages = computed(() => assets.value.filter(asset => asset.status === 'unannotated' && asset.kind !== 'video'))
-const annotatedImages = computed(() => assets.value.filter(asset => asset.status === 'annotated' && asset.kind !== 'video'))
+const unassignedImages = computed(() => assets.value.filter(asset => asset.status === 'unassigned' && asset.kind !== 'video'))
+const annotatingImages = computed(() => assets.value.filter(asset => (asset.status === 'unannotated' || asset.status === 'annotated') && asset.kind !== 'video'))
+
+const toggleSelection = (id) => {
+  const index = selectedUnassigned.value.indexOf(id)
+  if (index === -1) {
+    selectedUnassigned.value.push(id)
+  } else {
+    selectedUnassigned.value.splice(index, 1)
+  }
+}
+
+const assignSelected = () => {
+  assets.value.forEach(asset => {
+    if (selectedUnassigned.value.includes(asset.id)) {
+      asset.status = 'unannotated'
+    }
+  })
+  selectedUnassigned.value = []
+}
+
+const openAnnotationWorkspace = () => {
+  console.log('Open annotation workspace')
+}
 
 const goBack = () => {
   router.push('/')
@@ -170,39 +194,50 @@ onMounted(loadProject)
       <div v-if="errorMessage" class="empty-state error-state">{{ errorMessage }}</div>
       <div v-if="activeTab === 'dataset'" class="dataset-view">
         <div class="dataset-subnav">
-          <div class="subtabs">
-            <button 
-              :class="['subtab-btn', { active: datasetState === 'unannotated' }]"
-              @click="datasetState = 'unannotated'"
-            >[Unannotated]</button>
-            <button 
-              :class="['subtab-btn', { active: datasetState === 'annotated' }]"
-              @click="datasetState = 'annotated'"
-            >[Annotated]</button>
-          </div>
           <div class="actions">
-            <button class="action-btn" v-if="datasetState === 'unannotated'" @click="autoAnnotateAll">
+            <button class="action-btn" @click="autoAnnotateAll">
               [Auto-Annotate All (SAM3)]
             </button>
             <button class="action-btn" @click="showUploadModal = true">[Upload Media]</button>
           </div>
         </div>
 
-        <div class="grid-container">
-          <div v-if="datasetState === 'unannotated'" class="image-grid">
-            <div class="image-card" v-for="img in unannotatedImages" :key="img.id">
-              <div class="image-placeholder">{{ img.filename }}<br>{{ img.kind }}</div>
+        <div class="split-view">
+          <div class="pane left-pane">
+            <div class="pane-header">
+              <h3>Unassigned ({{ unassignedImages.length }})</h3>
+              <button class="action-btn" @click="assignSelected" :disabled="!selectedUnassigned.length">Assign -></button>
             </div>
-            <div v-if="unannotatedImages.length === 0" class="empty-state">
-              No unannotated images.
+            <div class="image-grid">
+              <div 
+                class="image-card" 
+                v-for="img in unassignedImages" 
+                :key="img.id"
+                :class="{ selected: selectedUnassigned.includes(img.id) }"
+                @click="toggleSelection(img.id)"
+              >
+                <img :src="`${API_BASE_URL}/api/v1/projects/${projectId}/dataset/assets/${img.id}/image`" class="served-image" />
+                <div class="image-label">{{ img.filename }}</div>
+              </div>
+              <div v-if="unassignedImages.length === 0" class="empty-state">
+                No unassigned images.
+              </div>
             </div>
           </div>
-          <div v-if="datasetState === 'annotated'" class="image-grid">
-            <div class="image-card" v-for="img in annotatedImages" :key="img.id">
-              <div class="image-placeholder">{{ img.filename }}<br>(Annotated)</div>
+          <div class="pane right-pane">
+            <div class="pane-header">
+              <h3>Annotating ({{ annotatingImages.length }})</h3>
+              <button class="action-btn" @click="openAnnotationWorkspace">Start Annotating</button>
             </div>
-            <div v-if="annotatedImages.length === 0" class="empty-state">
-              No annotated images.
+            <div class="image-grid">
+              <div class="image-card" v-for="img in annotatingImages" :key="img.id">
+                <img :src="`${API_BASE_URL}/api/v1/projects/${projectId}/dataset/assets/${img.id}/image`" class="served-image" />
+                <div class="image-label">{{ img.filename }}</div>
+                <div class="status-badge" v-if="img.status === 'annotated'">Annotated</div>
+              </div>
+              <div v-if="annotatingImages.length === 0" class="empty-state">
+                No images being annotated.
+              </div>
             </div>
           </div>
         </div>
@@ -375,29 +410,42 @@ button:hover {
 
 .dataset-subnav {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   border-bottom: 1px dashed #646262;
   padding-bottom: 1rem;
 }
 
-.subtabs {
+.split-view {
   display: flex;
-  gap: 1rem;
+  gap: 2rem;
+  height: 100%;
 }
 
-.actions {
+.pane {
+  flex: 1;
+  border: 1px solid var(--border-color, #646262);
+  padding: 1rem;
   display: flex;
-  gap: 1rem;
+  flex-direction: column;
 }
 
-.grid-container {
-  flex-grow: 1;
+.pane-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  border-bottom: 1px dashed var(--border-color, #646262);
+  padding-bottom: 0.5rem;
+}
+
+.pane-header h3 {
+  margin: 0;
 }
 
 .image-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 1rem;
 }
 
@@ -405,14 +453,42 @@ button:hover {
   aspect-ratio: 1;
   border: 1px solid #646262;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 0.5rem;
   text-align: center;
+  position: relative;
+  cursor: pointer;
 }
 
-.image-placeholder {
+.image-card.selected {
+  border-color: #fdfcfc;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.served-image {
+  max-width: 100%;
+  max-height: 80%;
+  object-fit: contain;
+  margin-bottom: 0.5rem;
+}
+
+.image-label {
+  font-size: 0.8rem;
+  word-break: break-all;
   color: #646262;
+}
+
+.status-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: #201d1d;
+  color: #fdfcfc;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.3rem;
+  border-bottom-left-radius: 4px;
 }
 
 .empty-state {
