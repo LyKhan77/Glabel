@@ -31,13 +31,24 @@
           <button class="btn sm-btn" @click="showModal = false">[x] Close</button>
         </div>
         <div style="margin-bottom: 1rem;">
-          <input v-model="projectName" type="text" placeholder="Workspace Name" class="austere-input" />
+          <input v-model="newProjectForm.name" type="text" placeholder="Workspace Name" class="austere-input" />
+        </div>
+        <div style="margin-bottom: 1rem;">
+          <label>
+            Task Type:
+            <select v-model="newProjectForm.task_type" class="austere-input">
+              <option value="classification">Classification</option>
+              <option value="object_detection">Object Detection</option>
+              <option value="segmentation">Segmentation</option>
+              <option value="pose_estimation">Pose Estimation</option>
+            </select>
+          </label>
         </div>
         <div class="modal-split">
           <!-- Left Column -->
           <div class="modal-col">
             <h3>AI Assistant</h3>
-            <textarea v-model="aiPrompt" placeholder="Describe your vision pipeline..."></textarea>
+            <textarea v-model="newProjectForm.description" placeholder="Describe your vision pipeline..."></textarea>
             <button class="btn" @click="submitNewProject()">Generate Pipeline</button>
           </div>
           <!-- Right Column -->
@@ -63,8 +74,7 @@ import { createProject, listProjects } from '../api/client'
 const router = useRouter()
 
 const showModal = ref(false)
-const aiPrompt = ref('')
-const projectName = ref('')
+const newProjectForm = ref({ name: '', description: '', task_type: 'object_detection' })
 const errorMessage = ref('')
 const isLoading = ref(false)
 
@@ -88,15 +98,15 @@ const openProject = (id) => {
 
 const submitNewProject = async (taskType = 'Generated Pipeline') => {
   errorMessage.value = ''
-  const fallbackName = aiPrompt.value.trim() || taskType
+  const fallbackName = newProjectForm.value.description.trim() || taskType
   try {
     const project = await createProject({
-      name: projectName.value.trim() || fallbackName,
-      description: aiPrompt.value.trim() || taskType
+      name: newProjectForm.value.name.trim() || fallbackName,
+      description: newProjectForm.value.description.trim() || taskType,
+      task_type: newProjectForm.value.task_type
     })
     showModal.value = false
-    projectName.value = ''
-    aiPrompt.value = ''
+    newProjectForm.value = { name: '', description: '', task_type: 'object_detection' }
     router.push(`/project/${project.id}`)
   } catch (error) {
     errorMessage.value = 'Could not create project. Check backend status.'
