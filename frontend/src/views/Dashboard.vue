@@ -36,7 +36,7 @@
         <div style="margin-bottom: 1rem;">
           <label>
             Task Type:
-            <select v-model="newProjectForm.task_type" class="text-input">
+            <select v-model="newProjectForm.task_type" class="austere-input">
               <option value="classification">Classification</option>
               <option value="object_detection">Object Detection</option>
               <option value="segmentation">Segmentation</option>
@@ -55,9 +55,9 @@
           <div class="modal-col">
             <h3>Manual Tasks</h3>
             <div class="task-grid">
-            <button class="btn" @click="submitNewProject('Object Detection')">Object Detection</button>
-            <button class="btn" @click="submitNewProject('Segmentation')">Segmentation</button>
-            <button class="btn" @click="submitNewProject('OCR')">OCR</button>
+            <button class="btn" @click="submitQuickTask('object_detection', 'Object Detection')">Object Detection</button>
+            <button class="btn" @click="submitQuickTask('segmentation', 'Segmentation')">Segmentation</button>
+            <button class="btn" @click="submitQuickTask('pose_estimation', 'Pose Estimation')">Pose Estimation</button>
             </div>
           </div>
         </div>
@@ -94,6 +94,11 @@ const loadProjects = async () => {
 
 const openProject = (id) => {
   router.push(`/project/${id}`)
+}
+
+const submitQuickTask = (typeEnum, description) => {
+  newProjectForm.value.task_type = typeEnum
+  submitNewProject(description)
 }
 
 const submitNewProject = async (taskType = 'Generated Pipeline') => {
