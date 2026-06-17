@@ -28,6 +28,7 @@ def create_project(data: ProjectCreate) -> dict:
             "id": str(uuid.uuid4()),
             "name": data.name,
             "description": data.description,
+            "task_type": data.task_type,
             "created_at": _now(),
             "updated_at": _now(),
         }

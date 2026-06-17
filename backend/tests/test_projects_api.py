@@ -46,3 +46,13 @@ def test_missing_project_returns_404(client):
 
 def test_empty_name_rejected(client):
     assert client.post("/api/v1/projects/", json={"name": ""}).status_code == 422
+
+
+def test_create_project_with_task_type(client):
+    response = client.post("/api/v1/projects/", json={
+        "name": "Test CV",
+        "description": "Desc",
+        "task_type": "object_detection"
+    })
+    assert response.status_code == 201
+    assert response.json()["task_type"] == "object_detection"
