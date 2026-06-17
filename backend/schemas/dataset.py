@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -48,4 +50,4 @@ class DatasetVersion(BaseModel):
     created_at: str
 class AssetAnnotationsUpdate(BaseModel):
     annotations: dict
-    status: str
+    status: Literal["unassigned", "unannotated", "annotated"]

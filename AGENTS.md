@@ -22,15 +22,15 @@ Open-source, **local-first** visual pipeline builder for Computer Vision (ComfyU
 
 ## Tech Stack · `[KEEP UPDATED]`
 
-- Frontend: Vue 3, Vite 4, `@vue-flow/core`, `vue-router` (Node v22).
+- Frontend: Vue 3, Vite 4, `@vue-flow/core`, `vue-router`, `lucide-vue-next` (Node v22).
 - Backend: FastAPI, Uvicorn, Pydantic v2, `filelock`, OpenCV headless, pytest + httpx (Python 3.10+).
 - Storage: flat JSON files (local `./glabel_data`, gitignored).
 - Planned: PyTorch, `ultralytics` (YOLOv11, RT-DETR), WebSockets.
 
 ## Key Features · `[KEEP UPDATED]`
 
-- Done: VueFlow node canvas, app shell, frontend/backend project integration, atomic JSON storage, Projects CRUD API, dataset upload/video frame extraction, annotation state, dataset versions, `/health`.
-- Planned: WebSocket streaming, real SAM/YOLO annotation output, Ultralytics training lifecycle, image serving, Playground DAG execution.
+- Done: VueFlow node canvas, app shell, frontend/backend project integration, atomic JSON storage, Projects CRUD API, dataset upload/video frame extraction, task-aware annotation studio, annotation state, dataset versions, `/health`.
+- Planned: WebSocket streaming, real SAM/YOLO annotation output, Ultralytics training lifecycle, image serving, Playground DAG execution, dataset export formats.
 
 ## Project Structure · `[KEEP UPDATED]`
 
@@ -38,7 +38,7 @@ Open-source, **local-first** visual pipeline builder for Computer Vision (ComfyU
 glabel/
 ├─ frontend/                      # Vue 3 + Vite + VueFlow app (dev :3000)
 │  ├─ index.html
-│  ├─ package.json                # deps: vue, vue-router, @vue-flow/core
+│  ├─ package.json                # deps: vue, vue-router, @vue-flow/core, lucide-vue-next
 │  ├─ vite.config.js              # dev server port 3000
 │  ├─ public/
 │  │  └─ platypus-glabel.png
@@ -51,6 +51,7 @@ glabel/
 │     │     ├─ InputNode.vue
 │     │     ├─ InferenceNode.vue
 │     │     └─ OutputNode.vue
+│     ├─ utils/                   # annotation geometry + task helpers
 │     └─ views/                   # routed pages
 │        ├─ Dashboard.vue
 │        ├─ Workspace.vue         # node canvas (VueFlow)
@@ -59,6 +60,7 @@ glabel/
 │        ├─ PlaygroundsDashboard.vue
 │        ├─ VisionJourney.vue
 │        └─ SettingsView.vue
+│  └─ tests/                      # Node tests for frontend utilities
 ├─ backend/                       # FastAPI app (run from project root, :8000)
 │  ├─ main.py                     # app, lifespan, CORS, router mount, /health
 │  ├─ requirements.txt
@@ -118,7 +120,7 @@ Full local app: install dependencies manually first, then `.\scripts\start-dev.p
 
 ## Current State (Changelog) · `[KEEP UPDATED]`
 
-**Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, annotation state, dataset version metadata, and interactive canvas annotation tools (Classes, BBox, Polygon, Pose Skeleton). Active branch `backend/implementation-v1`.
+**Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, dataset version metadata, and a task-aware annotation studio for classification, object detection, segmentation, and COCO pose. Active branch `feat/enhance-openvision`.
 
 | Date | Feature | Before | After |
 |---|---|---|---|
@@ -128,8 +130,9 @@ Full local app: install dependencies manually first, then `.\scripts\start-dev.p
 | **2026-06-17** | Dataset APIs & Scripts | Upload belum didukung | API *upload* OpenCV, *video frame extraction*, *PowerShell scripts*, dan integrasi API *frontend*. |
 | **2026-06-17** | Annotation Workspace | Tampilan *Project* kosong | UI Assignment & *scaffold* Workspace di `ProjectView.vue`. |
 | **2026-06-17** | Interactive Canvas Editor | *Mock overlays* statis (HTML biasa) | *Native SVG overlay* untuk *Pan/Zoom*, *Classes CRUD*, *BBox*, *Polygon*, dan *COCO Skeleton Template*. Tersedia *Save API*. |
+| **2026-06-18** | Annotation Studio | Canvas dan toolbar anotasi belum proper | Studio anotasi task-aware untuk classification, box, polygon, dan COCO pose; koordinat natural-image, undo/redo, mock AI assist, dan coverage round-trip anotasi. |
 
-**Next:** WebSocket layer, real SAM/YOLO auto-annotation output integration, Ultralytics training lifecycle execution.
+**Next:** WebSocket layer, real SAM/YOLO auto-annotation output integration, Ultralytics training lifecycle execution, dataset export formats.
 
 ## Documentation Maintenance
 

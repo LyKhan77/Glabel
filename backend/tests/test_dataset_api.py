@@ -181,3 +181,46 @@ def test_update_asset_annotations(client, project_id):
     listed = client.get(f"/api/v1/projects/{project_id}/dataset/assets")
     assert listed.json()[0]["status"] == "annotated"
     assert "bboxes" in listed.json()[0]["annotations"]
+
+
+@pytest.mark.parametrize(
+    "annotations",
+    [
+        {"classId": "person", "null": False},
+        {"bboxes": [{"id": "box-1", "x": 10, "y": 10, "width": 100, "height": 100, "classId": "person", "color": "#007aff"}]},
+        {"polygons": [{"id": "poly-1", "classId": "person", "color": "#007aff", "points": [{"x": 10, "y": 10}, {"x": 50, "y": 10}, {"x": 30, "y": 40}]}]},
+        {"skeletons": [{"id": "pose-1", "classId": "person", "color": "#007aff", "keypoints": [{"name": "nose", "x": 10, "y": 10, "visible": True}]}]},
+        {"null": True},
+    ],
+)
+def test_update_asset_annotations_round_trips_supported_shapes(client, project_id, annotations):
+    _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
+    uploaded = client.post(
+        f"/api/v1/projects/{project_id}/dataset/upload",
+        files={"files": ("sample.png", encoded.tobytes(), "image/png")},
+    )
+    asset_id = uploaded.json()["assets"][0]["id"]
+
+    updated = client.put(
+        f"/api/v1/projects/{project_id}/dataset/assets/{asset_id}/annotations",
+        json={"annotations": annotations, "status": "annotated"},
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["annotations"] == annotations
+
+
+def test_update_asset_annotations_rejects_invalid_status(client, project_id):
+    _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
+    uploaded = client.post(
+        f"/api/v1/projects/{project_id}/dataset/upload",
+        files={"files": ("sample.png", encoded.tobytes(), "image/png")},
+    )
+    asset_id = uploaded.json()["assets"][0]["id"]
+
+    updated = client.put(
+        f"/api/v1/projects/{project_id}/dataset/assets/{asset_id}/annotations",
+        json={"annotations": {"null": True}, "status": "reviewing"},
+    )
+
+    assert updated.status_code == 422

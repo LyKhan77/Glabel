@@ -1,7 +1,40 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { updateProject } from '../api/client.js'
-import { saveAssetAnnotations } from '../api/client.js'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  BoxSelect,
+  BrainCircuit,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CircleDot,
+  Crosshair,
+  Hand,
+  Maximize2,
+  MousePointer2,
+  Pentagon,
+  Redo2,
+  RotateCcw,
+  Save,
+  Trash2,
+  Undo2,
+  Waypoints,
+  ZoomIn,
+  ZoomOut
+} from 'lucide-vue-next'
+import { saveAssetAnnotations, updateProject } from '../api/client.js'
+import {
+  COCO_EDGES,
+  TASK_LABELS,
+  clamp,
+  clampBox,
+  createEmptyAnnotations,
+  createPoseSkeleton,
+  getContainedImageRect,
+  getTaskTools,
+  isAnnotationComplete,
+  normalizeAnnotations,
+  pointerToImagePoint
+} from '../utils/annotationGeometry.js'
 
 const props = defineProps({
   project: {
@@ -19,839 +52,1477 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'saved'])
 
-const activeTab = ref('unannotated')
-
-const unannotatedAssets = computed(() => props.assets.filter(a => a.status === 'unannotated'))
-const annotatedAssets = computed(() => props.assets.filter(a => a.status === 'annotated'))
-
-const currentList = computed(() => activeTab.value === 'unannotated' ? unannotatedAssets.value : annotatedAssets.value)
-
+const activeQueue = ref('unannotated')
 const selectedImage = ref(null)
-
+const selectedAnnotation = ref(null)
 const activeTool = ref('select')
-const isDrawing = ref(false)
-const draftBBox = ref(null)
-const zoomContainerRef = ref(null)
+const projectClasses = ref([...(props.project.classes || [])])
+const activeClass = ref(projectClasses.value[0] || null)
+const newClassName = ref('')
+const errorMessage = ref('')
+const saveState = ref('')
 
-const zoomScale = ref(1)
+const viewportRef = ref(null)
+const imageMetrics = ref({ naturalWidth: 0, naturalHeight: 0 })
+const viewportSize = ref({ width: 0, height: 0 })
+const zoom = ref(1)
 const pan = ref({ x: 0, y: 0 })
-const MIN_ZOOM = 0.1
-const MAX_ZOOM = 10
-
-const isPanning = ref(false)
 const isSpaceDown = ref(false)
-const lastMousePos = ref({ x: 0, y: 0 })
-
+const interaction = ref(null)
+const draftBox = ref(null)
 const draftPolygon = ref(null)
-const cursorPos = ref({ x: 0, y: 0 })
+const cursorPoint = ref(null)
+const history = ref([])
+const redoStack = ref([])
+let resizeObserver = null
 
-const draggedNode = ref(null)
+const MIN_ZOOM = 0.25
+const MAX_ZOOM = 8
 
-const COCO_KEYPOINTS = [
-  'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
-  'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
-  'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
-  'left_knee', 'right_knee', 'left_ankle', 'right_ankle'
-]
+const taskType = computed(() => props.project.task_type || 'object_detection')
+const taskLabel = computed(() => TASK_LABELS[taskType.value] || taskType.value)
+const taskTools = computed(() => getTaskTools(taskType.value))
+const unannotatedAssets = computed(() => props.assets.filter((asset) => asset.status !== 'annotated'))
+const annotatedAssets = computed(() => props.assets.filter((asset) => asset.status === 'annotated'))
+const currentAssets = computed(() => activeQueue.value === 'annotated' ? annotatedAssets.value : unannotatedAssets.value)
+const selectedIndex = computed(() => currentAssets.value.findIndex((asset) => asset.id === selectedImage.value?.id))
+const selectedAnnotations = computed(() => normalizeAnnotations(taskType.value, selectedImage.value?.annotations))
+const canUndo = computed(() => history.value.length > 0)
+const canRedo = computed(() => redoStack.value.length > 0)
+const canSave = computed(() => Boolean(selectedImage.value))
+const imageRect = computed(() => getContainedImageRect({
+  viewportWidth: viewportSize.value.width,
+  viewportHeight: viewportSize.value.height,
+  naturalWidth: imageMetrics.value.naturalWidth,
+  naturalHeight: imageMetrics.value.naturalHeight
+}))
+const stageStyle = computed(() => ({
+  transform: `translate(${pan.value.x}px, ${pan.value.y}px) scale(${zoom.value})`,
+  transformOrigin: '0 0'
+}))
+const imgStyle = computed(() => ({
+  left: `${imageRect.value.x}px`,
+  top: `${imageRect.value.y}px`,
+  width: `${imageRect.value.width}px`,
+  height: `${imageRect.value.height}px`
+}))
+const canvasCursor = computed(() => {
+  if (isSpaceDown.value || interaction.value?.type === 'pan') return 'grabbing'
+  if (activeTool.value === 'bbox' || activeTool.value === 'polygon') return 'crosshair'
+  return 'default'
+})
+const selectedDetail = computed(() => {
+  if (!selectedAnnotation.value) return null
+  return findAnnotation(selectedAnnotation.value)
+})
 
-const COCO_EDGES = [
-  [15, 13], [13, 11], [16, 14], [14, 12], [11, 12], [5, 11], [6, 12], [5, 6],
-  [5, 7], [6, 8], [7, 9], [8, 10], [1, 2], [0, 1], [0, 2], [1, 3], [2, 4],
-  [3, 5], [4, 6]
-]
-
-const handleKeydown = (e) => {
-  if (e.code === 'Space') {
-    isSpaceDown.value = true
-    if (e.target === document.body) {
-      e.preventDefault()
-    }
+watch(() => props.assets, () => {
+  if (!selectedImage.value || !props.assets.some((asset) => asset.id === selectedImage.value.id)) {
+    selectAsset(currentAssets.value[0] || props.assets[0] || null)
   }
-}
+}, { immediate: true })
 
-const handleKeyup = (e) => {
-  if (e.code === 'Space') {
-    isSpaceDown.value = false
-  }
-}
+watch(taskType, () => {
+  activeTool.value = 'select'
+  activeClass.value = projectClasses.value[0] || null
+})
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('keyup', handleKeyup)
+  resizeObserver = new ResizeObserver(updateViewportSize)
+  if (viewportRef.value) resizeObserver.observe(viewportRef.value)
+  updateViewportSize()
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('keyup', handleKeyup)
+  resizeObserver?.disconnect()
 })
 
-const handleWheel = (e) => {
-  e.preventDefault()
-  const zoomSensitivity = 0.001
-  const delta = e.deltaY * -zoomSensitivity
-  const newScale = Math.min(Math.max(zoomScale.value * (1 + delta), MIN_ZOOM), MAX_ZOOM)
-  
-  const scaleRatio = newScale / zoomScale.value
-  
-  const containerRect = e.currentTarget.getBoundingClientRect()
-  const mouseX = e.clientX - containerRect.left
-  const mouseY = e.clientY - containerRect.top
-  
-  pan.value.x = mouseX - (mouseX - pan.value.x) * scaleRatio
-  pan.value.y = mouseY - (mouseY - pan.value.y) * scaleRatio
-  
-  zoomScale.value = newScale
-}
-
-const handleMouseDown = (e) => {
-  if (e.button === 1 || (e.button === 0 && isSpaceDown.value) || (e.button === 0 && activeTool.value === 'select')) {
-    e.preventDefault()
-    isPanning.value = true
-    lastMousePos.value = { x: e.clientX, y: e.clientY }
-  } else if (e.button === 0 && activeTool.value === 'draw_bbox' && zoomContainerRef.value) {
-    if (!activeClass.value) {
-      alert("Please select a class first.")
-      return
-    }
-    const rect = zoomContainerRef.value.getBoundingClientRect()
-    const svgX = (e.clientX - rect.left) / zoomScale.value
-    const svgY = (e.clientY - rect.top) / zoomScale.value
-    
-    isDrawing.value = true
-    draftBBox.value = {
-      startX: svgX,
-      startY: svgY,
-      x: svgX,
-      y: svgY,
-      width: 0,
-      height: 0,
-      classId: activeClass.value.id,
-      color: activeClass.value.color || '#00ff00'
-    }
-  } else if (e.button === 0 && activeTool.value === 'draw_polygon' && zoomContainerRef.value) {
-    if (!activeClass.value) {
-      alert("Please select a class first.")
-      return
-    }
-    const rect = zoomContainerRef.value.getBoundingClientRect()
-    const svgX = (e.clientX - rect.left) / zoomScale.value
-    const svgY = (e.clientY - rect.top) / zoomScale.value
-
-    if (!draftPolygon.value) {
-      draftPolygon.value = {
-        classId: activeClass.value.id,
-        color: activeClass.value.color || '#00ff00',
-        points: []
-      }
-    }
-    draftPolygon.value.points.push({ x: svgX, y: svgY })
-    cursorPos.value = { x: svgX, y: svgY }
+function selectAsset(asset) {
+  selectedImage.value = asset
+  selectedAnnotation.value = null
+  draftBox.value = null
+  draftPolygon.value = null
+  cursorPoint.value = null
+  history.value = []
+  redoStack.value = []
+  saveState.value = ''
+  errorMessage.value = ''
+  if (asset) {
+    asset.annotations = normalizeAnnotations(taskType.value, asset.annotations)
   }
+  nextTick(fitView)
 }
 
-const startDragNode = (e, skelIdx, nodeIdx) => {
-  if (e.button !== 0 || activeTool.value !== 'select') return
-  draggedNode.value = { skelIdx, nodeIdx }
-  e.preventDefault()
+function selectRelativeAsset(offset) {
+  if (!currentAssets.value.length) return
+  const current = selectedIndex.value === -1 ? 0 : selectedIndex.value
+  const nextIndex = clamp(current + offset, 0, currentAssets.value.length - 1)
+  selectAsset(currentAssets.value[nextIndex])
 }
 
-const handleMouseMove = (e) => {
-  if (isPanning.value) {
-    const dx = e.clientX - lastMousePos.value.x
-    const dy = e.clientY - lastMousePos.value.y
-    pan.value.x += dx
-    pan.value.y += dy
-    lastMousePos.value = { x: e.clientX, y: e.clientY }
-  } else if (draggedNode.value && zoomContainerRef.value && selectedImage.value?.annotations?.skeletons) {
-    const rect = zoomContainerRef.value.getBoundingClientRect()
-    const currentX = (e.clientX - rect.left) / zoomScale.value
-    const currentY = (e.clientY - rect.top) / zoomScale.value
-    
-    const { skelIdx, nodeIdx } = draggedNode.value
-    const skeleton = selectedImage.value.annotations.skeletons[skelIdx]
-    skeleton.keypoints[nodeIdx].x = currentX
-    skeleton.keypoints[nodeIdx].y = currentY
-  } else if (isDrawing.value && zoomContainerRef.value && activeTool.value === 'draw_bbox') {
-    const rect = zoomContainerRef.value.getBoundingClientRect()
-    const currentX = (e.clientX - rect.left) / zoomScale.value
-    const currentY = (e.clientY - rect.top) / zoomScale.value
-    
-    draftBBox.value.x = Math.min(draftBBox.value.startX, currentX)
-    draftBBox.value.y = Math.min(draftBBox.value.startY, currentY)
-    draftBBox.value.width = Math.abs(currentX - draftBBox.value.startX)
-    draftBBox.value.height = Math.abs(currentY - draftBBox.value.startY)
-  } else if (draftPolygon.value && activeTool.value === 'draw_polygon' && zoomContainerRef.value) {
-    const rect = zoomContainerRef.value.getBoundingClientRect()
-    cursorPos.value.x = (e.clientX - rect.left) / zoomScale.value
-    cursorPos.value.y = (e.clientY - rect.top) / zoomScale.value
+function getImageUrl(asset) {
+  return `${props.apiBaseUrl}/api/v1/projects/${props.project.id}/dataset/assets/${asset.id}/image`
+}
+
+function updateViewportSize() {
+  if (!viewportRef.value) return
+  const rect = viewportRef.value.getBoundingClientRect()
+  viewportSize.value = { width: rect.width, height: rect.height }
+}
+
+function handleImageLoad(event) {
+  imageMetrics.value = {
+    naturalWidth: event.target.naturalWidth,
+    naturalHeight: event.target.naturalHeight
   }
+  fitView()
 }
 
-const handleMouseUp = () => {
-  isPanning.value = false
-  if (draggedNode.value) {
-    draggedNode.value = null
-  }
-  if (isDrawing.value && activeTool.value === 'draw_bbox') {
-    if (draftBBox.value && draftBBox.value.width > 5 && draftBBox.value.height > 5) {
-      if (!selectedImage.value.annotations) {
-        selectedImage.value.annotations = {}
-      }
-      if (!selectedImage.value.annotations.bboxes) {
-        selectedImage.value.annotations.bboxes = []
-      }
-      
-      const { startX, startY, ...finalBBox } = draftBBox.value
-      selectedImage.value.annotations.bboxes.push(finalBBox)
-    }
-    isDrawing.value = false
-    draftBBox.value = null
-  }
-}
-
-const handleDblClick = (e) => {
-  if (activeTool.value === 'draw_polygon' && draftPolygon.value) {
-    if (draftPolygon.value.points.length >= 3) {
-      if (!selectedImage.value.annotations) {
-        selectedImage.value.annotations = {}
-      }
-      if (!selectedImage.value.annotations.polygons) {
-        selectedImage.value.annotations.polygons = []
-      }
-      selectedImage.value.annotations.polygons.push(draftPolygon.value)
-    }
-    draftPolygon.value = null
-  }
-}
-
-const resetView = () => {
-  zoomScale.value = 1
+function fitView() {
+  zoom.value = 1
   pan.value = { x: 0, y: 0 }
 }
 
-const newClassName = ref('')
-const projectClasses = ref([...(props.project.classes || [])])
-const activeClass = ref(null)
-
-const generateRandomColor = () => {
-  return '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')
+function resetView() {
+  fitView()
 }
 
-const addClass = async () => {
-  const name = newClassName.value.trim()
-  if (!name) return
-  
-  if (projectClasses.value.some(c => c.name.toLowerCase() === name.toLowerCase())) {
-    return
+function zoomAtCenter(multiplier) {
+  const center = {
+    x: viewportSize.value.width / 2,
+    y: viewportSize.value.height / 2
   }
-
-  const newClass = {
-    id: crypto.randomUUID(),
-    name: name,
-    color: generateRandomColor()
-  }
-  
-  const backup = [...projectClasses.value]
-  projectClasses.value.push(newClass)
-  newClassName.value = ''
-  
-  try {
-    await updateProject(props.project.id, { classes: projectClasses.value })
-  } catch (error) {
-    console.error("Failed to update project classes:", error)
-    projectClasses.value = backup
-  }
+  setZoom(zoom.value * multiplier, center)
 }
 
-const removeClass = async (classId) => {
-  const backup = [...projectClasses.value]
-  projectClasses.value = projectClasses.value.filter(c => c.id !== classId)
-  if (activeClass.value?.id === classId) {
-    activeClass.value = null
+function setZoom(nextZoom, center) {
+  const normalized = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM)
+  const ratio = normalized / zoom.value
+  pan.value = {
+    x: center.x - (center.x - pan.value.x) * ratio,
+    y: center.y - (center.y - pan.value.y) * ratio
   }
-  try {
-    await updateProject(props.project.id, { classes: projectClasses.value })
-  } catch (error) {
-    console.error("Failed to update project classes:", error)
-    projectClasses.value = backup
-  }
+  zoom.value = normalized
 }
 
-const getImageUrl = (img) => `${props.apiBaseUrl}/api/v1/projects/${props.project.id}/dataset/assets/${img.id}/image`
-
-const selectImage = (img) => {
-  selectedImage.value = img
+function pointFromEvent(event) {
+  if (!viewportRef.value || !imageMetrics.value.naturalWidth) return null
+  return pointerToImagePoint({
+    clientX: event.clientX,
+    clientY: event.clientY,
+    containerRect: viewportRef.value.getBoundingClientRect(),
+    pan: pan.value,
+    zoom: zoom.value,
+    imageRect: imageRect.value,
+    naturalWidth: imageMetrics.value.naturalWidth,
+    naturalHeight: imageMetrics.value.naturalHeight
+  })
 }
 
-const mockClassify = (className) => {
-  if (selectedImage.value) {
-    selectedImage.value.annotations = { class: className }
+function stageX(x) {
+  return imageRect.value.x + x * imageRect.value.scale
+}
+
+function stageY(y) {
+  return imageRect.value.y + y * imageRect.value.scale
+}
+
+function stageWidth(width) {
+  return width * imageRect.value.scale
+}
+
+function displayBox(box) {
+  return {
+    x: stageX(box.x),
+    y: stageY(box.y),
+    width: stageWidth(box.width),
+    height: stageWidth(box.height)
   }
 }
 
-const spawnSkeleton = () => {
-  if (!activeClass.value) {
-    alert("Please select a class first.")
-    return
-  }
+function displayPoints(points = []) {
+  return points.map((point) => `${stageX(point.x)},${stageY(point.y)}`).join(' ')
+}
+
+function ensureActiveClass() {
+  if (activeClass.value) return true
+  errorMessage.value = 'Select or create a class before annotating.'
+  return false
+}
+
+function pushHistory() {
   if (!selectedImage.value) return
-  
-  if (!selectedImage.value.annotations) selectedImage.value.annotations = {}
-  if (!selectedImage.value.annotations.skeletons) selectedImage.value.annotations.skeletons = []
+  history.value.push(JSON.stringify(selectedImage.value.annotations || createEmptyAnnotations(taskType.value)))
+  redoStack.value = []
+  saveState.value = ''
+}
 
-  let centerX = 100
-  let centerY = 100
-  
-  if (zoomContainerRef.value) {
-    const parentRect = zoomContainerRef.value.parentElement.getBoundingClientRect()
-    const viewCenterX = parentRect.width / 2
-    const viewCenterY = parentRect.height / 2
-    centerX = (viewCenterX - pan.value.x) / zoomScale.value
-    centerY = (viewCenterY - pan.value.y) / zoomScale.value
-  }
+function replaceAnnotations(nextAnnotations, shouldPushHistory = true) {
+  if (!selectedImage.value) return
+  if (shouldPushHistory) pushHistory()
+  selectedImage.value.annotations = normalizeAnnotations(taskType.value, nextAnnotations)
+}
 
-  const spread = 50 / zoomScale.value
-  
-  const keypoints = COCO_KEYPOINTS.map((name) => {
-    let offsetX = (Math.random() - 0.5) * spread
-    let offsetY = (Math.random() - 0.5) * spread
-    
-    if (name.includes('left')) offsetX -= spread
-    if (name.includes('right')) offsetX += spread
-    if (name.includes('knee') || name.includes('ankle')) offsetY += spread * 2
-    if (name.includes('eye') || name.includes('ear') || name.includes('nose')) offsetY -= spread * 2
-    
-    return {
-      x: centerX + offsetX,
-      y: centerY + offsetY,
-      name,
-      visible: true
-    }
-  })
+function undo() {
+  if (!selectedImage.value || !history.value.length) return
+  redoStack.value.push(JSON.stringify(selectedImage.value.annotations || createEmptyAnnotations(taskType.value)))
+  selectedImage.value.annotations = JSON.parse(history.value.pop())
+  selectedAnnotation.value = null
+}
 
-  selectedImage.value.annotations.skeletons.push({
-    classId: activeClass.value.id,
-    color: activeClass.value.color || '#00ff00',
-    keypoints
+function redo() {
+  if (!selectedImage.value || !redoStack.value.length) return
+  history.value.push(JSON.stringify(selectedImage.value.annotations || createEmptyAnnotations(taskType.value)))
+  selectedImage.value.annotations = JSON.parse(redoStack.value.pop())
+  selectedAnnotation.value = null
+}
+
+function handleWheel(event) {
+  event.preventDefault()
+  setZoom(zoom.value * (event.deltaY < 0 ? 1.12 : 0.88), {
+    x: event.clientX - event.currentTarget.getBoundingClientRect().left,
+    y: event.clientY - event.currentTarget.getBoundingClientRect().top
   })
 }
 
-const saveAnnotation = async () => {
-  if (selectedImage.value) {
-    try {
-      const updatedAsset = await saveAssetAnnotations(
-        props.project.id, 
-        selectedImage.value.id, 
-        selectedImage.value.annotations || {}, 
-        'annotated'
-      )
-      selectedImage.value.status = 'annotated'
-      console.log('Saved annotations:', updatedAsset.annotations)
-      activeTab.value = 'annotated'
-    } catch (e) {
-      console.error('Failed to save annotations:', e)
-      alert('Failed to save annotations')
+function handleCanvasDown(event) {
+  if (!selectedImage.value) return
+  errorMessage.value = ''
+
+  if (event.button === 1 || isSpaceDown.value || activeTool.value === 'select') {
+    interaction.value = { type: 'pan', start: { x: event.clientX, y: event.clientY }, pan: { ...pan.value } }
+    event.preventDefault()
+    return
+  }
+
+  const point = pointFromEvent(event)
+  if (!point) return
+
+  if (activeTool.value === 'bbox') {
+    if (!ensureActiveClass()) return
+    draftBox.value = {
+      startX: point.x,
+      startY: point.y,
+      x: point.x,
+      y: point.y,
+      width: 0,
+      height: 0,
+      classId: activeClass.value.id,
+      color: activeClass.value.color
+    }
+    interaction.value = { type: 'draw-box' }
+  }
+
+  if (activeTool.value === 'polygon') {
+    if (!ensureActiveClass()) return
+    if (!draftPolygon.value) {
+      draftPolygon.value = {
+        id: createId(),
+        classId: activeClass.value.id,
+        color: activeClass.value.color,
+        points: []
+      }
+    }
+    draftPolygon.value.points.push(point)
+    cursorPoint.value = point
+  }
+}
+
+function handleCanvasMove(event) {
+  const point = pointFromEvent(event)
+  cursorPoint.value = point
+
+  if (interaction.value?.type === 'pan') {
+    pan.value = {
+      x: interaction.value.pan.x + event.clientX - interaction.value.start.x,
+      y: interaction.value.pan.y + event.clientY - interaction.value.start.y
+    }
+    return
+  }
+
+  if (!point || !selectedImage.value) return
+
+  if (interaction.value?.type === 'draw-box' && draftBox.value) {
+    draftBox.value.x = Math.min(draftBox.value.startX, point.x)
+    draftBox.value.y = Math.min(draftBox.value.startY, point.y)
+    draftBox.value.width = Math.abs(point.x - draftBox.value.startX)
+    draftBox.value.height = Math.abs(point.y - draftBox.value.startY)
+  }
+
+  if (interaction.value?.type === 'move-box') {
+    const annotations = selectedAnnotations.value
+    const box = annotations.bboxes.find((item) => item.id === interaction.value.id)
+    if (!box) return
+    const dx = point.x - interaction.value.startPoint.x
+    const dy = point.y - interaction.value.startPoint.y
+    box.x = clamp(Math.round(interaction.value.startBox.x + dx), 0, imageMetrics.value.naturalWidth - box.width)
+    box.y = clamp(Math.round(interaction.value.startBox.y + dy), 0, imageMetrics.value.naturalHeight - box.height)
+    selectedImage.value.annotations = annotations
+  }
+
+  if (interaction.value?.type === 'resize-box') {
+    resizeBox(point)
+  }
+
+  if (interaction.value?.type === 'move-polygon-point') {
+    const polygon = selectedAnnotations.value.polygons.find((item) => item.id === interaction.value.id)
+    if (polygon?.points[interaction.value.pointIndex]) {
+      polygon.points[interaction.value.pointIndex] = point
+      selectedImage.value.annotations = selectedAnnotations.value
     }
   }
+
+  if (interaction.value?.type === 'move-keypoint') {
+    const skeleton = selectedAnnotations.value.skeletons.find((item) => item.id === interaction.value.id)
+    if (skeleton?.keypoints[interaction.value.pointIndex]) {
+      skeleton.keypoints[interaction.value.pointIndex].x = point.x
+      skeleton.keypoints[interaction.value.pointIndex].y = point.y
+      selectedImage.value.annotations = selectedAnnotations.value
+    }
+  }
+}
+
+function handleCanvasUp() {
+  if (interaction.value?.type === 'draw-box' && draftBox.value) {
+    const box = clampBox(draftBox.value, imageMetrics.value.naturalWidth, imageMetrics.value.naturalHeight)
+    if (box) {
+      const annotations = selectedAnnotations.value
+      annotations.bboxes.push({
+        id: createId(),
+        classId: draftBox.value.classId,
+        color: draftBox.value.color,
+        ...box
+      })
+      replaceAnnotations(annotations)
+    }
+    draftBox.value = null
+  }
+  interaction.value = null
+}
+
+function handleCanvasDblClick() {
+  if (activeTool.value === 'polygon') closeDraftPolygon()
+}
+
+function closeDraftPolygon() {
+  if (!draftPolygon.value) return
+  if (draftPolygon.value.points.length >= 3) {
+    const annotations = selectedAnnotations.value
+    annotations.polygons.push({
+      ...draftPolygon.value,
+      points: draftPolygon.value.points.map((point) => ({ ...point }))
+    })
+    replaceAnnotations(annotations)
+  }
+  draftPolygon.value = null
+  cursorPoint.value = null
+}
+
+function cancelDraft() {
+  draftBox.value = null
+  draftPolygon.value = null
+  cursorPoint.value = null
+  interaction.value = null
+}
+
+function selectAnnotation(type, id) {
+  selectedAnnotation.value = { type, id }
+}
+
+function startBoxMove(event, box) {
+  if (activeTool.value !== 'select') return
+  const point = pointFromEvent(event)
+  if (!point) return
+  selectAnnotation('bbox', box.id)
+  pushHistory()
+  interaction.value = {
+    type: 'move-box',
+    id: box.id,
+    startPoint: point,
+    startBox: { ...box }
+  }
+}
+
+function startBoxResize(event, box, handle) {
+  const point = pointFromEvent(event)
+  if (!point) return
+  selectAnnotation('bbox', box.id)
+  pushHistory()
+  interaction.value = {
+    type: 'resize-box',
+    id: box.id,
+    handle,
+    startBox: { ...box }
+  }
+}
+
+function resizeBox(point) {
+  const annotations = selectedAnnotations.value
+  const box = annotations.bboxes.find((item) => item.id === interaction.value.id)
+  if (!box) return
+  const start = interaction.value.startBox
+  const next = { ...start }
+  if (interaction.value.handle.includes('e')) next.width = point.x - start.x
+  if (interaction.value.handle.includes('s')) next.height = point.y - start.y
+  if (interaction.value.handle.includes('w')) {
+    next.x = point.x
+    next.width = start.x + start.width - point.x
+  }
+  if (interaction.value.handle.includes('n')) {
+    next.y = point.y
+    next.height = start.y + start.height - point.y
+  }
+  const clamped = clampBox(next, imageMetrics.value.naturalWidth, imageMetrics.value.naturalHeight, 1)
+  if (!clamped) return
+  Object.assign(box, clamped)
+  selectedImage.value.annotations = annotations
+}
+
+function startPolygonPointMove(event, polygon, pointIndex) {
+  if (activeTool.value !== 'select') return
+  selectAnnotation('polygon', polygon.id)
+  pushHistory()
+  interaction.value = { type: 'move-polygon-point', id: polygon.id, pointIndex }
+}
+
+function startKeypointMove(event, skeleton, pointIndex) {
+  if (activeTool.value !== 'select') return
+  selectAnnotation('skeleton', skeleton.id)
+  pushHistory()
+  interaction.value = { type: 'move-keypoint', id: skeleton.id, pointIndex }
+}
+
+function toggleKeypoint(skeleton, pointIndex) {
+  const annotations = selectedAnnotations.value
+  const target = annotations.skeletons.find((item) => item.id === skeleton.id)
+  if (!target) return
+  pushHistory()
+  target.keypoints[pointIndex].visible = !target.keypoints[pointIndex].visible
+  selectedImage.value.annotations = annotations
+}
+
+function deleteSelected() {
+  if (!selectedAnnotation.value) return
+  const annotations = selectedAnnotations.value
+  pushHistory()
+  if (selectedAnnotation.value.type === 'bbox') {
+    annotations.bboxes = annotations.bboxes.filter((item) => item.id !== selectedAnnotation.value.id)
+  }
+  if (selectedAnnotation.value.type === 'polygon') {
+    annotations.polygons = annotations.polygons.filter((item) => item.id !== selectedAnnotation.value.id)
+  }
+  if (selectedAnnotation.value.type === 'skeleton') {
+    annotations.skeletons = annotations.skeletons.filter((item) => item.id !== selectedAnnotation.value.id)
+  }
+  selectedAnnotation.value = null
+  selectedImage.value.annotations = annotations
+}
+
+function markNull() {
+  selectedAnnotation.value = null
+  replaceAnnotations({ ...createEmptyAnnotations(taskType.value), null: true })
+}
+
+function clearAnnotations() {
+  selectedAnnotation.value = null
+  replaceAnnotations(createEmptyAnnotations(taskType.value))
+}
+
+function setClassification(classId) {
+  replaceAnnotations({ ...createEmptyAnnotations('classification'), classId, null: false })
+}
+
+function spawnSkeleton() {
+  if (!ensureActiveClass() || !selectedImage.value) return
+  const annotations = selectedAnnotations.value
+  const skeleton = createPoseSkeleton({
+    id: createId(),
+    classId: activeClass.value.id,
+    color: activeClass.value.color,
+    center: {
+      x: imageMetrics.value.naturalWidth / 2,
+      y: imageMetrics.value.naturalHeight / 2
+    }
+  })
+  annotations.skeletons.push(skeleton)
+  replaceAnnotations(annotations)
+  selectedAnnotation.value = { type: 'skeleton', id: skeleton.id }
+}
+
+function runMockAssist() {
+  if (!selectedImage.value) return
+  errorMessage.value = ''
+  if (!projectClasses.value.length) {
+    errorMessage.value = 'Create a class before using mock AI assist.'
+    return
+  }
+  activeClass.value = activeClass.value || projectClasses.value[0]
+  const classId = activeClass.value.id
+  const color = activeClass.value.color
+  const w = imageMetrics.value.naturalWidth
+  const h = imageMetrics.value.naturalHeight
+
+  if (taskType.value === 'classification') {
+    setClassification(classId)
+    return
+  }
+  if (taskType.value === 'object_detection') {
+    replaceAnnotations({
+      ...selectedAnnotations.value,
+      null: false,
+      bboxes: [
+        ...selectedAnnotations.value.bboxes,
+        { id: createId(), classId, color, x: Math.round(w * 0.25), y: Math.round(h * 0.2), width: Math.round(w * 0.5), height: Math.round(h * 0.55) }
+      ]
+    })
+    return
+  }
+  if (taskType.value === 'segmentation') {
+    replaceAnnotations({
+      ...selectedAnnotations.value,
+      null: false,
+      polygons: [
+        ...selectedAnnotations.value.polygons,
+        {
+          id: createId(),
+          classId,
+          color,
+          points: [
+            { x: Math.round(w * 0.5), y: Math.round(h * 0.18) },
+            { x: Math.round(w * 0.78), y: Math.round(h * 0.48) },
+            { x: Math.round(w * 0.5), y: Math.round(h * 0.82) },
+            { x: Math.round(w * 0.22), y: Math.round(h * 0.48) }
+          ]
+        }
+      ]
+    })
+    return
+  }
+  spawnSkeleton()
+}
+
+async function saveAnnotation() {
+  if (!selectedImage.value) return
+  errorMessage.value = ''
+  saveState.value = 'Saving...'
+  try {
+    const annotations = normalizeAnnotations(taskType.value, selectedImage.value.annotations)
+    const status = isAnnotationComplete(taskType.value, annotations) ? 'annotated' : 'unannotated'
+    const updatedAsset = await saveAssetAnnotations(props.project.id, selectedImage.value.id, annotations, status)
+    selectedImage.value.annotations = updatedAsset.annotations
+    selectedImage.value.status = updatedAsset.status
+    saveState.value = 'Saved'
+    emit('saved', updatedAsset)
+  } catch (error) {
+    errorMessage.value = 'Could not save annotation. Check backend status.'
+    saveState.value = ''
+  }
+}
+
+async function addClass() {
+  const name = newClassName.value.trim()
+  if (!name || projectClasses.value.some((item) => item.name.toLowerCase() === name.toLowerCase())) return
+  const nextClass = { id: createId(), name, color: generateClassColor(projectClasses.value.length) }
+  const backup = [...projectClasses.value]
+  projectClasses.value.push(nextClass)
+  activeClass.value = nextClass
+  newClassName.value = ''
+  try {
+    await updateProject(props.project.id, { classes: projectClasses.value })
+  } catch (error) {
+    projectClasses.value = backup
+    activeClass.value = backup[0] || null
+    errorMessage.value = 'Could not save class list.'
+  }
+}
+
+async function removeClass(classId) {
+  const backup = [...projectClasses.value]
+  projectClasses.value = projectClasses.value.filter((item) => item.id !== classId)
+  if (activeClass.value?.id === classId) activeClass.value = projectClasses.value[0] || null
+  try {
+    await updateProject(props.project.id, { classes: projectClasses.value })
+  } catch (error) {
+    projectClasses.value = backup
+    errorMessage.value = 'Could not remove class.'
+  }
+}
+
+function findClass(classId) {
+  return projectClasses.value.find((item) => item.id === classId)
+}
+
+function findAnnotation(selection) {
+  if (!selection) return null
+  const annotations = selectedAnnotations.value
+  if (selection.type === 'bbox') return annotations.bboxes.find((item) => item.id === selection.id)
+  if (selection.type === 'polygon') return annotations.polygons.find((item) => item.id === selection.id)
+  if (selection.type === 'skeleton') return annotations.skeletons.find((item) => item.id === selection.id)
+  return null
+}
+
+function annotationItems() {
+  const annotations = selectedAnnotations.value
+  if (taskType.value === 'classification') {
+    return annotations.classId ? [{ type: 'classification', id: annotations.classId, classId: annotations.classId }] : []
+  }
+  if (taskType.value === 'object_detection') return annotations.bboxes.map((item) => ({ ...item, type: 'bbox' }))
+  if (taskType.value === 'segmentation') return annotations.polygons.map((item) => ({ ...item, type: 'polygon' }))
+  if (taskType.value === 'pose_estimation') return annotations.skeletons.map((item) => ({ ...item, type: 'skeleton' }))
+  return []
+}
+
+function handleKeydown(event) {
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
+  if (event.code === 'Space') {
+    isSpaceDown.value = true
+    event.preventDefault()
+  }
+  if (event.key.toLowerCase() === 'v') activeTool.value = 'select'
+  if (event.key.toLowerCase() === 'b' && taskType.value === 'object_detection') activeTool.value = 'bbox'
+  if (event.key.toLowerCase() === 'p' && taskType.value === 'segmentation') activeTool.value = 'polygon'
+  if (event.key.toLowerCase() === 'k' && taskType.value === 'pose_estimation') activeTool.value = 'pose'
+  if (event.key === 'Enter' && draftPolygon.value) closeDraftPolygon()
+  if (event.key === 'Escape') cancelDraft()
+  if (event.key === 'Delete' || event.key === 'Backspace') deleteSelected()
+  if (event.ctrlKey && event.key.toLowerCase() === 'z') undo()
+  if ((event.ctrlKey && event.key.toLowerCase() === 'y') || (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'z')) redo()
+  if (event.ctrlKey && event.key.toLowerCase() === 's') {
+    event.preventDefault()
+    saveAnnotation()
+  }
+}
+
+function handleKeyup(event) {
+  if (event.code === 'Space') isSpaceDown.value = false
+}
+
+function createId() {
+  return crypto?.randomUUID ? crypto.randomUUID() : `ann-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function generateClassColor(index) {
+  const colors = ['#007aff', '#ff9f0a', '#30d158', '#ff3b30', '#8b5cf6', '#00a7c7', '#d946ef']
+  return colors[index % colors.length]
 }
 </script>
 
 <template>
-  <div class="workspace-layout">
-    <div class="sidebar">
-      <div class="sidebar-header">
-        <button class="nav-btn" @click="$emit('close')">[&lt;] Back</button>
-        <h3>Workspace</h3>
+  <div class="annotation-shell">
+    <aside class="queue-panel" aria-label="Dataset queue">
+      <div class="panel-header">
+        <button class="icon-text-btn" type="button" @click="$emit('close')">
+          <ChevronLeft :size="16" />
+          Back
+        </button>
+        <span class="task-pill">{{ taskLabel }}</span>
       </div>
-      <div class="tabs">
-        <button 
-          :class="['tab-btn', { active: activeTab === 'unannotated' }]"
-          @click="activeTab = 'unannotated'"
-        >Unannotated</button>
-        <button 
-          :class="['tab-btn', { active: activeTab === 'annotated' }]"
-          @click="activeTab = 'annotated'"
-        >Annotated</button>
+
+      <div class="queue-tabs" role="tablist" aria-label="Asset status">
+        <button :class="{ active: activeQueue === 'unannotated' }" type="button" @click="activeQueue = 'unannotated'">
+          To label {{ unannotatedAssets.length }}
+        </button>
+        <button :class="{ active: activeQueue === 'annotated' }" type="button" @click="activeQueue = 'annotated'">
+          Done {{ annotatedAssets.length }}
+        </button>
       </div>
-      <div class="image-list">
-        <div v-for="img in currentList" :key="img.id" 
-             :class="['image-item', { 'selected': selectedImage?.id === img.id }]"
-             @click="selectImage(img)">
-          {{ img.filename }}
+
+      <div class="asset-list">
+        <button
+          v-for="asset in currentAssets"
+          :key="asset.id"
+          :class="['asset-row', { selected: selectedImage?.id === asset.id }]"
+          type="button"
+          @click="selectAsset(asset)"
+        >
+          <span class="asset-name">{{ asset.filename }}</span>
+          <span class="asset-status">{{ asset.status }}</span>
+        </button>
+        <p v-if="currentAssets.length === 0" class="empty-state">No assets in this queue.</p>
+      </div>
+    </aside>
+
+    <main class="studio-panel">
+      <div class="toolbar" aria-label="Annotation toolbar">
+        <div class="toolbar-group">
+          <button
+            v-for="tool in taskTools"
+            :key="tool.id"
+            :class="['tool-btn', { active: activeTool === tool.id }]"
+            type="button"
+            :title="`${tool.label} (${tool.shortcut})`"
+            @click="activeTool = tool.id"
+          >
+            <MousePointer2 v-if="tool.id === 'select'" :size="17" />
+            <BoxSelect v-if="tool.id === 'bbox'" :size="17" />
+            <Pentagon v-if="tool.id === 'polygon'" :size="17" />
+            <Waypoints v-if="tool.id === 'pose'" :size="17" />
+            <span>{{ tool.label }}</span>
+          </button>
         </div>
-        <div v-if="currentList.length === 0" class="empty-state">
-          No images here.
+
+        <div class="toolbar-group">
+          <button class="icon-btn" type="button" title="Zoom out" @click="zoomAtCenter(0.85)">
+            <ZoomOut :size="17" />
+          </button>
+          <span class="zoom-readout">{{ Math.round(zoom * 100) }}%</span>
+          <button class="icon-btn" type="button" title="Zoom in" @click="zoomAtCenter(1.18)">
+            <ZoomIn :size="17" />
+          </button>
+          <button class="icon-btn" type="button" title="Fit image" @click="fitView">
+            <Maximize2 :size="17" />
+          </button>
+          <button class="icon-btn" type="button" title="Reset view" @click="resetView">
+            <RotateCcw :size="17" />
+          </button>
+        </div>
+
+        <div class="toolbar-group">
+          <button class="icon-btn" type="button" title="Undo" :disabled="!canUndo" @click="undo">
+            <Undo2 :size="17" />
+          </button>
+          <button class="icon-btn" type="button" title="Redo" :disabled="!canRedo" @click="redo">
+            <Redo2 :size="17" />
+          </button>
+          <button class="icon-btn danger" type="button" title="Delete selected" :disabled="!selectedAnnotation" @click="deleteSelected">
+            <Trash2 :size="17" />
+          </button>
+        </div>
+
+        <div class="toolbar-spacer"></div>
+
+        <div class="toolbar-group">
+          <button class="tool-btn" type="button" title="Mock AI assist" @click="runMockAssist">
+            <BrainCircuit :size="17" />
+            <span>Mock AI</span>
+          </button>
+          <button class="tool-btn" type="button" title="Mark this image as null/background" @click="markNull">
+            <CircleDot :size="17" />
+            <span>Null</span>
+          </button>
+          <button class="primary-btn" type="button" :disabled="!canSave" @click="saveAnnotation">
+            <Save :size="17" />
+            Save
+          </button>
         </div>
       </div>
-    </div>
-    <div class="canvas-area">
-      <div v-if="selectedImage" class="editor-container">
-        <div class="toolbar">
-          <button class="tool-btn" @click="resetView">Reset View</button>
-          <span class="task-badge">{{ project.task_type }}</span>
-          
-          <template v-if="project.task_type === 'classification'">
-            <button class="tool-btn" @click="mockClassify('Cat')">Cat</button>
-            <button class="tool-btn" @click="mockClassify('Dog')">Dog</button>
-          </template>
-          
-          <template v-else-if="project.task_type === 'object_detection'">
-            <button class="tool-btn" :class="{ active: activeTool === 'select' }" @click="activeTool = 'select'">Select</button>
-            <button class="tool-btn" :class="{ active: activeTool === 'draw_bbox' }" @click="activeTool = 'draw_bbox'">Draw BBox</button>
-          </template>
-          
-          <template v-else-if="project.task_type === 'segmentation'">
-            <button class="tool-btn" :class="{ active: activeTool === 'select' }" @click="activeTool = 'select'">Select</button>
-            <button class="tool-btn" :class="{ active: activeTool === 'draw_polygon' }" @click="activeTool = 'draw_polygon'">Draw Polygon</button>
-          </template>
-          
-          <template v-else-if="project.task_type === 'pose_estimation'">
-            <button class="tool-btn" :class="{ active: activeTool === 'select' }" @click="activeTool = 'select'">Select</button>
-            <button class="tool-btn" @click="spawnSkeleton">Spawn Skeleton</button>
-          </template>
-          
-          <div class="spacer"></div>
-          <button class="primary-btn" @click="saveAnnotation">Save Annotation</button>
-        </div>
-        
-        <div 
-          class="image-container"
+
+      <div v-if="selectedImage" class="canvas-wrap">
+        <div
+          ref="viewportRef"
+          class="canvas-viewport"
+          :style="{ cursor: canvasCursor }"
           @wheel="handleWheel"
-          @mousedown="handleMouseDown"
-          @mousemove="handleMouseMove"
-          @mouseup="handleMouseUp"
-          @mouseleave="handleMouseUp"
-          @dblclick="handleDblClick"
+          @mousedown="handleCanvasDown"
+          @mousemove="handleCanvasMove"
+          @mouseup="handleCanvasUp"
+          @mouseleave="handleCanvasUp"
+          @dblclick="handleCanvasDblClick"
           @contextmenu.prevent
         >
-          <div 
-            class="zoom-container"
-            ref="zoomContainerRef"
-            :style="{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomScale})`,
-              transformOrigin: '0 0'
-            }"
-          >
-            <img :src="getImageUrl(selectedImage)" alt="Asset" class="canvas-image" draggable="false" />
-            <svg class="annotation-svg" xmlns="http://www.w3.org/2000/svg">
-              <template v-if="selectedImage.annotations?.bboxes">
-                <g v-for="(bbox, idx) in selectedImage.annotations.bboxes" :key="idx">
-                  <rect 
-                    :x="bbox.x" :y="bbox.y" :width="bbox.width" :height="bbox.height" 
-                    fill="transparent" :stroke="bbox.color" stroke-width="2" 
-                  />
-                  <text 
-                    :x="bbox.x" :y="bbox.y - 4" :fill="bbox.color" font-size="12" font-family="sans-serif">
-                    {{ projectClasses.find(c => c.id === bbox.classId)?.name || 'Unknown' }}
-                  </text>
-                </g>
-              </template>
-              <template v-if="draftBBox">
-                <rect 
-                  :x="draftBBox.x" :y="draftBBox.y" :width="draftBBox.width" :height="draftBBox.height" 
-                  fill="rgba(255, 255, 255, 0.2)" :stroke="draftBBox.color" stroke-width="2" stroke-dasharray="4"
+          <div class="canvas-stage" :style="stageStyle">
+            <img
+              :src="getImageUrl(selectedImage)"
+              :alt="selectedImage.filename"
+              class="canvas-image"
+              :style="imgStyle"
+              draggable="false"
+              @load="handleImageLoad"
+            />
+            <svg
+              class="annotation-layer"
+              :viewBox="`0 0 ${viewportSize.width} ${viewportSize.height}`"
+              :width="viewportSize.width"
+              :height="viewportSize.height"
+              aria-hidden="true"
+            >
+              <g v-for="box in selectedAnnotations.bboxes || []" :key="box.id">
+                <rect
+                  v-bind="displayBox(box)"
+                  :class="['annotation-box', { selected: selectedAnnotation?.id === box.id }]"
+                  :stroke="box.color"
+                  @mousedown.stop="startBoxMove($event, box)"
                 />
-              </template>
-              <template v-if="selectedImage.annotations?.polygons">
-                <g v-for="(poly, idx) in selectedImage.annotations.polygons" :key="'poly-'+idx">
-                  <polygon 
-                    :points="poly.points.map(p => `${p.x},${p.y}`).join(' ')"
-                    fill="rgba(255, 255, 255, 0.2)" :stroke="poly.color" stroke-width="2"
-                  />
-                  <text 
-                    v-if="poly.points.length > 0"
-                    :x="poly.points[0].x" :y="poly.points[0].y - 4" :fill="poly.color" font-size="12" font-family="sans-serif">
-                    {{ projectClasses.find(c => c.id === poly.classId)?.name || 'Unknown' }}
-                  </text>
-                </g>
-              </template>
-              <template v-if="draftPolygon">
-                <polyline 
-                  :points="draftPolygon.points.map(p => `${p.x},${p.y}`).join(' ')"
-                  fill="none" :stroke="draftPolygon.color" stroke-width="2" stroke-dasharray="4"
-                />
-                <line 
-                  v-if="draftPolygon.points.length > 0"
-                  :x1="draftPolygon.points[draftPolygon.points.length - 1].x" 
-                  :y1="draftPolygon.points[draftPolygon.points.length - 1].y"
-                  :x2="cursorPos.x" 
-                  :y2="cursorPos.y"
-                  :stroke="draftPolygon.color" stroke-width="2" stroke-dasharray="4"
-                />
-                <circle 
-                  v-for="(p, i) in draftPolygon.points" :key="'dp-'+i"
-                  :cx="p.x" :cy="p.y" r="3" :fill="draftPolygon.color"
-                />
-              </template>
-              <template v-if="selectedImage.annotations?.skeletons">
-                <g v-for="(skel, sIdx) in selectedImage.annotations.skeletons" :key="'skel-'+sIdx">
-                  <line
-                    v-for="(edge, eIdx) in COCO_EDGES" :key="'edge-'+eIdx"
-                    :x1="skel.keypoints[edge[0]].x" :y1="skel.keypoints[edge[0]].y"
-                    :x2="skel.keypoints[edge[1]].x" :y2="skel.keypoints[edge[1]].y"
-                    :stroke="skel.color" stroke-width="2"
-                  />
+                <text :x="displayBox(box).x" :y="displayBox(box).y - 6" :fill="box.color" class="label-text">
+                  {{ findClass(box.classId)?.name || 'Unknown' }}
+                </text>
+                <g v-if="selectedAnnotation?.id === box.id">
                   <circle
-                    v-for="(kp, nIdx) in skel.keypoints" :key="'kp-'+nIdx"
-                    :cx="kp.x" :cy="kp.y" r="4" :fill="skel.color"
-                    class="skeleton-node"
-                    @mousedown.stop="startDragNode($event, sIdx, nIdx)"
+                    v-for="handle in ['nw', 'ne', 'sw', 'se']"
+                    :key="handle"
+                    class="resize-handle"
+                    :cx="handle.includes('w') ? displayBox(box).x : displayBox(box).x + displayBox(box).width"
+                    :cy="handle.includes('n') ? displayBox(box).y : displayBox(box).y + displayBox(box).height"
+                    r="5"
+                    @mousedown.stop="startBoxResize($event, box, handle)"
                   />
-                  <text 
-                    v-if="skel.keypoints.length > 0"
-                    :x="skel.keypoints[0].x" :y="skel.keypoints[0].y - 10" :fill="skel.color" font-size="12" font-family="sans-serif">
-                    {{ projectClasses.find(c => c.id === skel.classId)?.name || 'Unknown' }}
-                  </text>
                 </g>
-              </template>
+              </g>
+
+              <rect
+                v-if="draftBox"
+                v-bind="displayBox(draftBox)"
+                class="draft-shape"
+                :stroke="draftBox.color"
+              />
+
+              <g v-for="polygon in selectedAnnotations.polygons || []" :key="polygon.id">
+                <polygon
+                  :points="displayPoints(polygon.points)"
+                  :class="['annotation-polygon', { selected: selectedAnnotation?.id === polygon.id }]"
+                  :stroke="polygon.color"
+                  @mousedown.stop="selectAnnotation('polygon', polygon.id)"
+                />
+                <text
+                  v-if="polygon.points.length"
+                  :x="stageX(polygon.points[0].x)"
+                  :y="stageY(polygon.points[0].y) - 6"
+                  :fill="polygon.color"
+                  class="label-text"
+                >
+                  {{ findClass(polygon.classId)?.name || 'Unknown' }}
+                </text>
+                <circle
+                  v-for="(point, pointIndex) in polygon.points"
+                  :key="`${polygon.id}-${pointIndex}`"
+                  class="vertex-handle"
+                  :cx="stageX(point.x)"
+                  :cy="stageY(point.y)"
+                  r="5"
+                  @mousedown.stop="startPolygonPointMove($event, polygon, pointIndex)"
+                />
+              </g>
+
+              <g v-if="draftPolygon">
+                <polyline :points="displayPoints(draftPolygon.points)" class="draft-line" :stroke="draftPolygon.color" />
+                <line
+                  v-if="draftPolygon.points.length && cursorPoint"
+                  :x1="stageX(draftPolygon.points[draftPolygon.points.length - 1].x)"
+                  :y1="stageY(draftPolygon.points[draftPolygon.points.length - 1].y)"
+                  :x2="stageX(cursorPoint.x)"
+                  :y2="stageY(cursorPoint.y)"
+                  class="draft-line"
+                  :stroke="draftPolygon.color"
+                />
+                <circle
+                  v-for="(point, pointIndex) in draftPolygon.points"
+                  :key="`draft-${pointIndex}`"
+                  class="vertex-handle"
+                  :cx="stageX(point.x)"
+                  :cy="stageY(point.y)"
+                  r="4"
+                />
+              </g>
+
+              <g v-for="skeleton in selectedAnnotations.skeletons || []" :key="skeleton.id">
+                <line
+                  v-for="(edge, edgeIndex) in COCO_EDGES"
+                  :key="`${skeleton.id}-edge-${edgeIndex}`"
+                  class="skeleton-edge"
+                  :stroke="skeleton.color"
+                  :x1="stageX(skeleton.keypoints[edge[0]].x)"
+                  :y1="stageY(skeleton.keypoints[edge[0]].y)"
+                  :x2="stageX(skeleton.keypoints[edge[1]].x)"
+                  :y2="stageY(skeleton.keypoints[edge[1]].y)"
+                />
+                <circle
+                  v-for="(keypoint, pointIndex) in skeleton.keypoints"
+                  :key="`${skeleton.id}-point-${pointIndex}`"
+                  :class="['keypoint', { hidden: !keypoint.visible }]"
+                  :fill="skeleton.color"
+                  :cx="stageX(keypoint.x)"
+                  :cy="stageY(keypoint.y)"
+                  r="5"
+                  @mousedown.stop="startKeypointMove($event, skeleton, pointIndex)"
+                  @dblclick.stop="toggleKeypoint(skeleton, pointIndex)"
+                />
+                <text
+                  v-if="skeleton.keypoints.length"
+                  :x="stageX(skeleton.keypoints[0].x)"
+                  :y="stageY(skeleton.keypoints[0].y) - 10"
+                  :fill="skeleton.color"
+                  class="label-text"
+                  @mousedown.stop="selectAnnotation('skeleton', skeleton.id)"
+                >
+                  {{ findClass(skeleton.classId)?.name || 'Unknown' }}
+                </text>
+              </g>
             </svg>
-            
-            <!-- Mock Overlays -->
-            <div v-if="selectedImage.annotations?.class" class="mock-class" style="position: absolute; left: 10px; top: 10px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px;">Class: {{ selectedImage.annotations.class }}</div>
+          </div>
+
+          <div v-if="selectedAnnotations.null" class="null-banner">
+            <Check :size="16" />
+            Marked as null/background
+          </div>
+          <div v-if="activeTool === 'bbox' || activeTool === 'polygon'" class="crosshair-hint">
+            <Crosshair :size="16" />
+            {{ activeTool === 'bbox' ? 'Drag to draw box' : 'Click points, Enter to close' }}
           </div>
         </div>
-        
-        <div class="debug-panel">
-          <pre>Annotations: {{ selectedImage.annotations || '{}' }}</pre>
+
+        <div class="canvas-footer" role="status" aria-live="polite">
+          <span>{{ selectedImage.filename }}</span>
+          <span>{{ imageMetrics.naturalWidth }} x {{ imageMetrics.naturalHeight }}</span>
+          <span v-if="saveState">{{ saveState }}</span>
+          <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
         </div>
       </div>
-      <p v-else class="empty-canvas-message">Select an image from the sidebar to start annotating.</p>
-    </div>
-    <div class="right-sidebar">
-      <div class="sidebar-header">
-        <h3>Classes</h3>
+
+      <div v-else class="empty-canvas">
+        Select an asset to start annotating.
       </div>
-      <div class="classes-panel">
-        <div class="add-class-form">
-          <input v-model="newClassName" type="text" placeholder="New class name..." @keyup.enter="addClass" />
-          <button class="primary-btn" @click="addClass">Add</button>
+    </main>
+
+    <aside class="inspector-panel" aria-label="Annotation inspector">
+      <section class="inspector-section">
+        <div class="section-title">
+          <h3>Classes</h3>
+        </div>
+        <div class="add-class">
+          <input v-model="newClassName" type="text" placeholder="New class" @keyup.enter="addClass" />
+          <button class="icon-btn" type="button" title="Add class" @click="addClass">
+            <Check :size="16" />
+          </button>
         </div>
         <div class="class-list">
-          <div v-for="c in projectClasses" :key="c.id"
-               :class="['class-item', { active: activeClass?.id === c.id }]"
-               @click="activeClass = c">
-            <span class="color-dot" :style="{ backgroundColor: c.color }"></span>
-            <span class="class-name">{{ c.name }}</span>
-            <button class="del-btn" @click.stop="removeClass(c.id)">Del</button>
-          </div>
-          <div v-if="projectClasses.length === 0" class="empty-state">
-            No classes defined.
-          </div>
+          <button
+            v-for="item in projectClasses"
+            :key="item.id"
+            :class="['class-row', { active: activeClass?.id === item.id || selectedAnnotations.classId === item.id }]"
+            type="button"
+            @click="taskType === 'classification' ? setClassification(item.id) : activeClass = item"
+          >
+            <span class="color-dot" :style="{ backgroundColor: item.color }"></span>
+            <span>{{ item.name }}</span>
+            <Trash2 :size="14" class="row-action" @click.stop="removeClass(item.id)" />
+          </button>
+          <p v-if="projectClasses.length === 0" class="empty-state">Create a class before labeling.</p>
         </div>
-      </div>
-    </div>
+      </section>
+
+      <section v-if="taskType === 'pose_estimation'" class="inspector-section">
+        <div class="section-title">
+          <h3>Pose</h3>
+        </div>
+        <button class="tool-btn full-width" type="button" :class="{ active: activeTool === 'pose' }" @click="spawnSkeleton">
+          <Waypoints :size="17" />
+          Spawn COCO skeleton
+        </button>
+        <p class="hint-text">Drag keypoints to place joints. Double-click a keypoint to toggle visibility.</p>
+      </section>
+
+      <section class="inspector-section">
+        <div class="section-title">
+          <h3>Annotations</h3>
+          <button class="text-btn" type="button" @click="clearAnnotations">Clear</button>
+        </div>
+        <div class="annotation-list">
+          <button
+            v-for="item in annotationItems()"
+            :key="`${item.type}-${item.id}`"
+            :class="['annotation-row', { selected: selectedAnnotation?.id === item.id || selectedAnnotations.classId === item.id }]"
+            type="button"
+            @click="item.type === 'classification' ? setClassification(item.classId) : selectAnnotation(item.type, item.id)"
+          >
+            <span class="color-dot" :style="{ backgroundColor: findClass(item.classId)?.color || item.color }"></span>
+            <span>{{ findClass(item.classId)?.name || 'Unknown' }}</span>
+            <span class="type-chip">{{ item.type }}</span>
+          </button>
+          <p v-if="annotationItems().length === 0 && !selectedAnnotations.null" class="empty-state">No annotations yet.</p>
+        </div>
+      </section>
+
+      <section v-if="selectedDetail" class="inspector-section">
+        <div class="section-title">
+          <h3>Selected</h3>
+        </div>
+        <label class="field-label">
+          Class
+          <select
+            :value="selectedDetail.classId"
+            @change="replaceAnnotations({
+              ...selectedAnnotations,
+              [selectedAnnotation.type === 'bbox' ? 'bboxes' : selectedAnnotation.type === 'polygon' ? 'polygons' : 'skeletons']:
+                selectedAnnotations[selectedAnnotation.type === 'bbox' ? 'bboxes' : selectedAnnotation.type === 'polygon' ? 'polygons' : 'skeletons'].map((item) => item.id === selectedDetail.id ? { ...item, classId: $event.target.value, color: findClass($event.target.value)?.color || item.color } : item)
+            })"
+          >
+            <option v-for="item in projectClasses" :key="item.id" :value="item.id">{{ item.name }}</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="inspector-section">
+        <div class="section-title">
+          <h3>Image</h3>
+        </div>
+        <dl class="meta-list">
+          <div><dt>Status</dt><dd>{{ selectedImage?.status || '-' }}</dd></div>
+          <div><dt>Size</dt><dd>{{ imageMetrics.naturalWidth || '-' }} x {{ imageMetrics.naturalHeight || '-' }}</dd></div>
+          <div><dt>Tool</dt><dd>{{ activeTool }}</dd></div>
+        </dl>
+      </section>
+    </aside>
   </div>
 </template>
 
 <style scoped>
-.workspace-layout { 
-  display: flex; 
-  flex-grow: 1;
-  min-height: 500px;
+.annotation-shell {
+  display: grid;
+  grid-template-columns: minmax(190px, 240px) minmax(0, 1fr) minmax(230px, 280px);
+  min-height: calc(100vh - 150px);
   border: 1px solid var(--border-color, #646262);
-}
-
-.sidebar {
-  width: 250px;
-  border-right: 1px solid var(--border-color, #646262);
-  display: flex;
-  flex-direction: column;
-}
-
-.right-sidebar {
-  width: 250px;
-  border-left: 1px solid var(--border-color, #646262);
-  display: flex;
-  flex-direction: column;
   background: var(--bg-color, #fdfcfc);
-}
-
-.sidebar-header {
-  padding: 1rem;
-  border-bottom: 1px dashed var(--border-color, #646262);
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.sidebar-header h3 {
-  margin: 0;
-  font-weight: normal;
-}
-
-.tabs {
-  display: flex;
-  border-bottom: 1px dashed var(--border-color, #646262);
-}
-
-.tab-btn {
-  flex: 1;
-  padding: 0.5rem;
-  background: transparent;
-  border: none;
-  border-right: 1px dashed var(--border-color, #646262);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: inherit;
-  color: inherit;
-}
-
-.tab-btn:last-child {
-  border-right: none;
-}
-
-.tab-btn.active {
-  background: var(--text-color, #201d1d);
-  color: var(--bg-color, #fdfcfc);
-}
-
-.tab-btn:not(.active):hover {
-  text-decoration: underline;
-}
-
-.image-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.image-item {
-  padding: 0.5rem;
-  border: 1px solid var(--border-color, #646262);
-  cursor: pointer;
-  font-size: 0.8rem;
-  word-break: break-all;
-}
-
-.image-item:hover {
-  background: rgba(0,0,0,0.05);
-}
-
-.image-item.selected {
-  background: var(--text-color, #201d1d);
-  color: var(--bg-color, #fdfcfc);
-}
-
-.canvas-area {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--border-color, #646262);
-}
-
-.empty-canvas-message {
-  font-style: italic;
-}
-
-.nav-btn {
-  background: transparent;
-  border: none;
-  font-family: inherit;
-  font-size: inherit;
-  color: inherit;
-  cursor: pointer;
-  padding: 0;
-}
-
-.nav-btn:hover {
-  text-decoration: underline;
-}
-
-.empty-state {
-  color: #646262;
-  font-style: italic;
-  padding: 1rem;
-  text-align: center;
-}
-
-.editor-container {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
   color: var(--text-color, #201d1d);
 }
 
-.toolbar {
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.queue-panel,
+.inspector-panel {
+  min-width: 0;
   display: flex;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid var(--border-color, #646262);
-  align-items: center;
+  flex-direction: column;
+  border-color: var(--border-color, #646262);
   background: var(--bg-color, #fdfcfc);
 }
 
-.task-badge {
-  background: #eee;
-  color: #333;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  margin-right: 1rem;
-  font-style: normal;
+.queue-panel {
+  border-right: 1px solid var(--border-color, #646262);
 }
 
-.tool-btn {
-  padding: 0.3rem 0.6rem;
-  cursor: pointer;
-  border: 1px solid var(--border-color, #646262);
-  background: transparent;
-  color: inherit;
-  font-family: inherit;
-}
-
-.tool-btn:hover {
-  background: rgba(0,0,0,0.05);
-}
-
-.tool-btn.active {
-  background: var(--text-color, #201d1d);
-  color: var(--bg-color, #fdfcfc);
-}
-
-.primary-btn {
-  padding: 0.3rem 0.6rem;
-  cursor: pointer;
-  background: var(--text-color, #201d1d);
-  color: var(--bg-color, #fdfcfc);
-  border: 1px solid var(--text-color, #201d1d);
-  font-family: inherit;
-}
-
-.spacer {
-  flex-grow: 1;
-}
-
-.image-container {
-  flex-grow: 1;
-  position: relative;
-  overflow: hidden;
-  background: #111;
-  cursor: grab;
-}
-
-.image-container:active {
-  cursor: grabbing;
-}
-
-.zoom-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.canvas-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  pointer-events: none;
-  display: block;
-}
-
-.annotation-svg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.skeleton-node {
-  pointer-events: auto;
-  cursor: pointer;
-}
-
-.debug-panel {
-  padding: 0.5rem;
-  border-top: 1px solid var(--border-color, #646262);
-  background: #f5f5f5;
-  font-family: monospace;
-  font-size: 0.8rem;
-  color: #333;
-  max-height: 100px;
+.inspector-panel {
+  border-left: 1px solid var(--border-color, #646262);
   overflow-y: auto;
-  font-style: normal;
-  margin: 0;
 }
 
-.classes-panel {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  padding: 0.5rem;
-  gap: 1rem;
-}
-
-.add-class-form {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.add-class-form input {
-  flex: 1;
-  padding: 0.3rem;
-  border: 1px solid var(--border-color, #646262);
-  font-family: inherit;
-  font-size: 0.9rem;
-}
-
-.class-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.class-item {
+.panel-header,
+.toolbar,
+.canvas-footer,
+.section-title {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.4rem;
+}
+
+.panel-header {
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0.65rem;
+  border-bottom: 1px dashed var(--border-color, #646262);
+}
+
+.icon-text-btn,
+.tool-btn,
+.primary-btn,
+.icon-btn,
+.text-btn {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
   border: 1px solid var(--border-color, #646262);
-  cursor: pointer;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  padding: 0.25rem 0.55rem;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
-.class-item:hover {
-  background: rgba(0,0,0,0.05);
+.icon-btn {
+  width: 34px;
+  padding: 0;
 }
 
-.class-item.active {
+.text-btn {
+  min-height: 28px;
+  border: none;
+  padding: 0;
+  color: #646262;
+}
+
+.tool-btn:hover,
+.icon-btn:hover,
+.icon-text-btn:hover {
+  background: rgba(15, 0, 0, 0.06);
+}
+
+.tool-btn.active,
+.primary-btn,
+.queue-tabs button.active {
   background: var(--text-color, #201d1d);
   color: var(--bg-color, #fdfcfc);
+  border-color: var(--text-color, #201d1d);
+}
+
+.danger {
+  color: #ff3b30;
+}
+
+.task-pill,
+.type-chip,
+.asset-status,
+.zoom-readout {
+  color: #646262;
+  font-size: 0.75rem;
+}
+
+.queue-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px dashed var(--border-color, #646262);
+}
+
+.queue-tabs button {
+  min-height: 36px;
+  border: none;
+  border-right: 1px dashed var(--border-color, #646262);
+  background: transparent;
+  color: inherit;
+}
+
+.queue-tabs button:last-child {
+  border-right: none;
+}
+
+.asset-list,
+.class-list,
+.annotation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.55rem;
+}
+
+.asset-row,
+.class-row,
+.annotation-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--border-color, #646262);
+  background: transparent;
+  color: inherit;
+  padding: 0.45rem;
+  text-align: left;
+}
+
+.asset-row {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.asset-row.selected,
+.class-row.active,
+.annotation-row.selected {
+  background: #201d1d;
+  color: #fdfcfc;
+}
+
+.asset-name {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.studio-panel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar {
+  flex-wrap: wrap;
+  min-height: 52px;
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--border-color, #646262);
+}
+
+.toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.canvas-wrap {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.canvas-viewport {
+  position: relative;
+  min-height: 520px;
+  flex: 1;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+    #171515;
+  background-size: 32px 32px;
+}
+
+.canvas-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.canvas-image,
+.annotation-layer {
+  position: absolute;
+  user-select: none;
+}
+
+.canvas-image {
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.annotation-layer {
+  inset: 0;
+  overflow: visible;
+}
+
+.annotation-box,
+.annotation-polygon {
+  fill: rgba(255, 255, 255, 0.09);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: auto;
+}
+
+.annotation-box.selected,
+.annotation-polygon.selected {
+  stroke-width: 3;
+}
+
+.draft-shape,
+.draft-line {
+  fill: rgba(255, 255, 255, 0.06);
+  stroke-width: 2;
+  stroke-dasharray: 6;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.label-text {
+  font-size: 12px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #171515;
+  stroke-width: 3px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: auto;
+}
+
+.resize-handle,
+.vertex-handle,
+.keypoint {
+  fill: #fdfcfc;
+  stroke: #201d1d;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: auto;
+}
+
+.keypoint.hidden {
+  opacity: 0.35;
+}
+
+.skeleton-edge {
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.null-banner,
+.crosshair-hint {
+  position: absolute;
+  left: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  background: rgba(32, 29, 29, 0.84);
+  color: #fdfcfc;
+  padding: 0.45rem 0.65rem;
+}
+
+.null-banner {
+  top: 1rem;
+}
+
+.crosshair-hint {
+  bottom: 1rem;
+}
+
+.canvas-footer {
+  min-height: 36px;
+  justify-content: space-between;
+  padding: 0.35rem 0.65rem;
+  border-top: 1px solid var(--border-color, #646262);
+  color: #646262;
+  font-size: 0.8rem;
+}
+
+.inspector-section {
+  padding: 0.75rem;
+  border-bottom: 1px dashed var(--border-color, #646262);
+}
+
+.section-title {
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+}
+
+.section-title h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.add-class {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.add-class input,
+.field-label select {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--border-color, #646262);
+  border-radius: 4px;
+  background: #f8f7f7;
+  color: inherit;
+  padding: 0.45rem;
+}
+
+.class-row,
+.annotation-row {
+  justify-content: flex-start;
+}
+
+.row-action {
+  margin-left: auto;
 }
 
 .color-dot {
   width: 12px;
   height: 12px;
-  border-radius: 50%;
-  border: 1px solid #fff;
-  box-shadow: 0 0 0 1px #000;
+  flex: 0 0 12px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
 }
 
-.class-name {
+.full-width {
+  width: 100%;
+}
+
+.hint-text,
+.empty-state {
+  color: #646262;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 0.4rem 0;
+}
+
+.field-label {
+  display: grid;
+  gap: 0.35rem;
+  color: #646262;
+  font-size: 0.8rem;
+}
+
+.meta-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.meta-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.meta-list dt,
+.meta-list dd {
+  margin: 0;
+}
+
+.meta-list dt {
+  color: #646262;
+}
+
+.empty-canvas {
   flex: 1;
-  font-size: 0.9rem;
+  display: grid;
+  place-items: center;
+  color: #646262;
 }
 
-.del-btn {
-  background: #ff4444;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  padding: 2px 6px;
-  font-size: 0.7rem;
-  cursor: pointer;
+.error-text {
+  color: #ff3b30;
 }
 
-.del-btn:hover {
-  background: #cc0000;
+@media (max-width: 1024px) {
+  .annotation-shell {
+    grid-template-columns: minmax(160px, 210px) minmax(0, 1fr);
+  }
+
+  .inspector-panel {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--border-color, #646262);
+    border-left: none;
+    max-height: 280px;
+  }
+}
+
+@media (max-width: 720px) {
+  .annotation-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .queue-panel {
+    border-right: none;
+    border-bottom: 1px solid var(--border-color, #646262);
+  }
+
+  .asset-list {
+    max-height: 160px;
+    overflow-y: auto;
+  }
+
+  .canvas-viewport {
+    min-height: 420px;
+  }
 }
 </style>

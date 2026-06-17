@@ -66,4 +66,26 @@ const toggleTheme = () => {
 .nav-item:hover { background: var(--hover-bg, rgba(15,0,0,0.05)); }
 .router-link-active { background: var(--hover-bg, rgba(15,0,0,0.05)); border-left: 3px solid var(--text-color); font-weight: bold; }
 .theme-btn { background: transparent; border: none; cursor: pointer; text-align: left; font-family: inherit; font-size: inherit; margin-top: auto; border-left: none; width: 100%; display: flex; align-items: center; gap: 1rem; }
+
+@media (max-width: 720px) {
+  .sidebar {
+    width: 72px;
+  }
+
+  .logo {
+    padding: 1rem;
+    justify-content: center;
+  }
+
+  .logo-brand,
+  .nav-text {
+    display: none;
+  }
+
+  .nav-item,
+  .theme-btn {
+    justify-content: center;
+    padding: 0.75rem 0;
+  }
+}
 </style>

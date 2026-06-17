@@ -26,6 +26,7 @@ The project intentionally avoids heavy infrastructure: no SQL database, no Docke
 | Frontend build | Vite | ^4.4 |
 | Canvas / DAG | `@vue-flow/core` | ^1.29 |
 | Routing | `vue-router` | ^4.2 |
+| Icons | `lucide-vue-next` | ^0.x |
 | Backend framework | FastAPI | >=0.110 |
 | ASGI server | Uvicorn (`[standard]`) | >=0.27 |
 | Validation | Pydantic v2 | >=2.6 |
@@ -46,13 +47,14 @@ The project intentionally avoids heavy infrastructure: no SQL database, no Docke
 - Frontend/backend integration for project list, create, and detail flows.
 - Backend dataset upload API with image/video ingestion and OpenCV frame extraction.
 - Backend dataset auto-annotation state transition and dataset version metadata.
+- Dataset annotation studio with task-aware classification, bounding box, polygon, and COCO pose tools.
 - Per-project local data directory (`GLABEL_DATA_DIR`), gitignored.
 
 **Planned (roadmap):**
 - WebSocket layer streaming Ultralytics training epochs / playground inference signals.
 - Real SAM/YOLO auto-annotation output and image serving.
 - Model training lifecycle and Playground DAG execution.
-- Pose estimation, instance segmentation, classification tasks.
+- Training-time export formats for annotated datasets.
 
 ## Project Structure  ·  `[KEEP UPDATED]`
 
@@ -62,10 +64,12 @@ glabel/
 │  ├─ src/
 │  │  ├─ App.vue, main.js
 │  │  ├─ api/client.js        # fetch client for FastAPI
+│  │  ├─ utils/               # annotation geometry + task helpers
 │  │  ├─ views/               # Dashboard, ModelsView, PlaygroundsDashboard,
 │  │  │                       # ProjectView, SettingsView, VisionJourney, Workspace
 │  │  ├─ components/layout/   # Sidebar
 │  │  └─ components/nodes/    # InputNode, InferenceNode, OutputNode
+│  ├─ tests/                  # Node tests for frontend utilities
 │  └─ vite.config.js          # dev server port 3000
 ├─ backend/                   # FastAPI app (run from project root, :8000)
 │  ├─ main.py                 # app, lifespan, CORS, router mount, /health
@@ -102,7 +106,7 @@ npm run preview    # preview the production build
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
 .\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload    # → http://127.0.0.1:8000
-.\.venv\Scripts\python.exe -m pytest backend/tests/ -v             # 14 tests, expect all pass
+.\.venv\Scripts\python.exe -m pytest backend/tests/ -v             # 27 tests, expect all pass
 ```
 
 **Full local app** (run from the **project root**, Windows PowerShell):
@@ -125,6 +129,7 @@ python -m venv .venv
 | DELETE | `/api/v1/projects/{id}` | Delete → 200 `{"status":"deleted","id"}` |
 | POST | `/api/v1/projects/{id}/dataset/upload` | Upload image/video files; videos extract frames via OpenCV |
 | GET | `/api/v1/projects/{id}/dataset/assets` | List dataset assets (`?status=unannotated|annotated`) |
+| PUT | `/api/v1/projects/{id}/dataset/assets/{asset_id}/annotations` | Save asset annotations and status |
 | POST | `/api/v1/projects/{id}/dataset/auto-annotate` | Mark non-video dataset assets as annotated |
 | GET | `/api/v1/projects/{id}/versions` | List dataset versions |
 | POST | `/api/v1/projects/{id}/versions` | Create dataset version metadata |
@@ -153,7 +158,7 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 
 **Status:** Frontend and backend are integrated for project CRUD, dataset upload, video frame extraction, annotation state, dataset version metadata, and interactive canvas annotation tools (Classes, BBox, Polygon, Pose Skeleton). Real model training remains intentionally out of scope for this branch.
 
-**Active branch:** `backend/implementation-v1` (pushed to `origin`; PR pending).
+**Active branch:** `feat/enhance-openvision`.
 
 ### Changelog
 | Date | Feature | Before | After |
@@ -164,6 +169,7 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 | **2026-06-17** | Dataset APIs & Scripts | Upload belum didukung | API *upload* OpenCV, *video frame extraction*, *PowerShell scripts*, dan integrasi API *frontend*. |
 | **2026-06-17** | Annotation Workspace | Tampilan *Project* kosong | UI Assignment & *scaffold* Workspace di `ProjectView.vue`. |
 | **2026-06-17** | Interactive Canvas Editor | *Mock overlays* statis (HTML biasa) | *Native SVG overlay* untuk *Pan/Zoom*, *Classes CRUD*, *BBox*, *Polygon*, dan *COCO Skeleton Template*. Tersedia *Save API*. |
+| **2026-06-18** | Annotation Studio | Canvas dan toolbar anotasi belum proper | Studio anotasi task-aware untuk classification, box, polygon, dan COCO pose; koordinat natural-image, undo/redo, mock AI assist, dan coverage round-trip anotasi. |
 
 **In development / next:**
 - WebSocket layer (training progress, playground inference).

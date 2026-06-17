@@ -68,6 +68,10 @@ const openAnnotationWorkspace = () => {
   isAnnotating.value = true
 }
 
+const refreshDatasetAssets = async () => {
+  assets.value = await listDatasetAssets(projectId.value)
+}
+
 const goBack = () => {
   router.push('/')
 }
@@ -214,6 +218,7 @@ onMounted(loadProject)
           :assets="annotatingImages"
           :apiBaseUrl="API_BASE_URL"
           @close="isAnnotating = false"
+          @saved="refreshDatasetAssets"
         />
         <div v-else class="split-view">
           <div class="pane left-pane">
@@ -664,5 +669,27 @@ button:disabled {
   background: var(--text-color, #201d1d);
   margin-top: -7px;
   cursor: ew-resize;
+}
+
+@media (max-width: 720px) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .content {
+    padding: 0.75rem;
+  }
+
+  .dataset-subnav {
+    justify-content: flex-start;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
 }
 </style>
