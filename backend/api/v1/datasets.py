@@ -21,7 +21,7 @@ def get_asset_image(project_id: str, asset_id: str):
     if not asset:
         raise HTTPException(status_code=404, detail="Image not found")
         
-    full_path = svc.get_asset_path(project_id, asset_id)
+    full_path = svc.get_asset_path(asset)
     if not full_path:
         raise HTTPException(status_code=404, detail="Image not found")
         

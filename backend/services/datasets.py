@@ -86,10 +86,7 @@ def get_asset(project_id: str, asset_id: str) -> dict | None:
     return None
 
 
-def get_asset_path(project_id: str, asset_id: str) -> Path | None:
-    asset = get_asset(project_id, asset_id)
-    if not asset:
-        return None
+def get_asset_path(asset: dict) -> Path | None:
     full_path = get_data_dir() / asset["stored_path"]
     if full_path.exists():
         return full_path
