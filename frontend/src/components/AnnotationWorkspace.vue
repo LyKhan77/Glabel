@@ -1,6 +1,5 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { API_BASE_URL } from '../api/client'
 
 const props = defineProps({
   project: {
@@ -10,6 +9,11 @@ const props = defineProps({
   assets: {
     type: Array,
     required: true
+  },
+  apiBaseUrl: {
+    type: String,
+    required: false,
+    default: ''
   }
 })
 

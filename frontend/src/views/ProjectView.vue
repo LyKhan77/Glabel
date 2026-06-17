@@ -212,6 +212,7 @@ onMounted(loadProject)
           v-if="isAnnotating"
           :project="project"
           :assets="annotatingImages"
+          :apiBaseUrl="API_BASE_URL"
           @close="isAnnotating = false"
         />
         <div v-else class="split-view">
