@@ -30,35 +30,58 @@
           <h2>Create New Project</h2>
           <button class="btn sm-btn" @click="showModal = false">[x] Close</button>
         </div>
-        <div style="margin-bottom: 1rem;">
-          <input v-model="newProjectForm.name" type="text" placeholder="Workspace Name" class="austere-input" />
+        <div class="tabs" style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color, #646262); padding-bottom: 0.5rem;">
+          <button class="btn sm-btn" :class="{ active: activeTab === 'manual' }" @click="activeTab = 'manual'" style="margin-right: 0.5rem;" :style="activeTab === 'manual' ? 'background: var(--text-color, #201d1d); color: var(--bg-color, #fdfcfc);' : ''">Manual Setup</button>
+          <button class="btn sm-btn" :class="{ active: activeTab === 'assistant' }" @click="activeTab = 'assistant'" :style="activeTab === 'assistant' ? 'background: var(--text-color, #201d1d); color: var(--bg-color, #fdfcfc);' : ''">Glabel Assistant</button>
         </div>
-        <div style="margin-bottom: 1rem;">
-          <label>
-            Task Type:
-            <select v-model="newProjectForm.task_type" class="austere-input">
-              <option value="classification">Classification</option>
-              <option value="object_detection">Object Detection</option>
-              <option value="segmentation">Segmentation</option>
-              <option value="pose_estimation">Pose Estimation</option>
-            </select>
-          </label>
-        </div>
-        <div class="modal-split">
-          <!-- Left Column -->
-          <div class="modal-col">
-            <h3>AI Assistant</h3>
-            <textarea v-model="newProjectForm.description" placeholder="Describe your vision pipeline..."></textarea>
-            <button class="btn" @click="submitNewProject()">Generate Pipeline</button>
+
+        <!-- Manual Setup Tab -->
+        <div v-if="activeTab === 'manual'">
+          <div style="margin-bottom: 1rem;">
+            <input v-model="newProjectForm.name" type="text" placeholder="Project Name" class="austere-input" />
           </div>
-          <!-- Right Column -->
-          <div class="modal-col">
-            <h3>Manual Tasks</h3>
-            <div class="task-grid">
-            <button class="btn" @click="submitQuickTask('object_detection', 'Object Detection')">Object Detection</button>
-            <button class="btn" @click="submitQuickTask('segmentation', 'Segmentation')">Segmentation</button>
-            <button class="btn" @click="submitQuickTask('pose_estimation', 'Pose Estimation')">Pose Estimation</button>
+          <div style="margin-bottom: 1rem;">
+            <label>
+              Task Type:
+              <select v-model="newProjectForm.task_type" class="austere-input">
+                <option value="classification">Classification</option>
+                <option value="object_detection">Object Detection</option>
+                <option value="segmentation">Segmentation</option>
+                <option value="pose_estimation">Pose Estimation</option>
+              </select>
+            </label>
+          </div>
+          <div style="margin-bottom: 1rem;">
+            <textarea v-model="newProjectForm.description" placeholder="Project Description..." class="austere-input" style="width: 100%; min-height: 100px; box-sizing: border-box;"></textarea>
+          </div>
+          <button class="btn" @click="submitNewProject()">Create Project</button>
+        </div>
+
+        <!-- Assistant Tab -->
+        <div v-if="activeTab === 'assistant'">
+          <div v-if="!isConfigured">
+            <h3>Configure Assistant</h3>
+            <div style="margin-bottom: 1rem;">
+              <label>Base URL:<input v-model="assistantConfig.baseUrl" type="text" class="austere-input" /></label>
             </div>
+            <div style="margin-bottom: 1rem;">
+              <label>API Key (optional):<input v-model="assistantConfig.apiKey" type="password" class="austere-input" /></label>
+            </div>
+            <div style="margin-bottom: 1rem;">
+              <label>Model:<input v-model="assistantConfig.model" type="text" class="austere-input" /></label>
+            </div>
+            <button class="btn" @click="saveConfig">Save Configuration</button>
+          </div>
+          <div v-else>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <h3 style="margin: 0; border: none; padding: 0;">Ask Glabel Assistant</h3>
+              <button class="btn sm-btn" @click="isConfigured = false">Edit Config</button>
+            </div>
+            <div style="margin-bottom: 1rem;">
+              <textarea v-model="assistantPrompt" placeholder="Describe your vision pipeline..." class="austere-input" style="width: 100%; min-height: 100px; box-sizing: border-box;"></textarea>
+            </div>
+            <div v-if="isAssistantLoading" style="margin-bottom: 1rem; font-style: italic; color: var(--border-color, #646262);">Assistant is thinking...</div>
+            <button v-else class="btn" @click="askAssistant">Ask Assistant</button>
           </div>
         </div>
       </div>
@@ -70,6 +93,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { createProject, listProjects } from '../api/client'
+import { askGlabelAssistant } from '../api/llmService'
 
 const router = useRouter()
 
@@ -79,6 +103,34 @@ const errorMessage = ref('')
 const isLoading = ref(false)
 
 const openVisionProjects = ref([])
+
+const activeTab = ref('manual') // 'manual' or 'assistant'
+const assistantConfig = ref({ baseUrl: 'http://localhost:11434/v1', apiKey: '', model: 'llama3' })
+const isConfigured = ref(false)
+const assistantPrompt = ref('')
+const isAssistantLoading = ref(false)
+
+const saveConfig = () => {
+  localStorage.setItem('glabel_agent_config', JSON.stringify(assistantConfig.value))
+  isConfigured.value = true
+}
+
+const askAssistant = async () => {
+  isAssistantLoading.value = true
+  errorMessage.value = ''
+  try {
+    const result = await askGlabelAssistant(assistantPrompt.value, assistantConfig.value)
+    // Pre-fill the form and switch to manual tab to let them review and submit
+    newProjectForm.value.name = result.project_name
+    newProjectForm.value.task_type = result.task_type
+    newProjectForm.value.description = assistantPrompt.value
+    activeTab.value = 'manual'
+  } catch (err) {
+    errorMessage.value = err.message
+  } finally {
+    isAssistantLoading.value = false
+  }
+}
 
 const loadProjects = async () => {
   isLoading.value = true
@@ -118,7 +170,14 @@ const submitNewProject = async (taskType = 'Generated Pipeline') => {
   }
 }
 
-onMounted(loadProjects)
+onMounted(() => {
+  loadProjects()
+  const saved = localStorage.getItem('glabel_agent_config')
+  if (saved) {
+    assistantConfig.value = JSON.parse(saved)
+    isConfigured.value = true
+  }
+})
 </script>
 
 <style scoped>
