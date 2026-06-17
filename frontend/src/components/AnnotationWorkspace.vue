@@ -30,7 +30,7 @@ const currentList = computed(() => activeTab.value === 'unannotated' ? unannotat
 const selectedImage = ref(null)
 
 const newClassName = ref('')
-const projectClasses = ref(props.project.classes || [])
+const projectClasses = ref([...(props.project.classes || [])])
 const activeClass = ref(null)
 
 const generateRandomColor = () => {
@@ -38,12 +38,20 @@ const generateRandomColor = () => {
 }
 
 const addClass = async () => {
-  if (!newClassName.value.trim()) return
+  const name = newClassName.value.trim()
+  if (!name) return
+  
+  if (projectClasses.value.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+    return
+  }
+
   const newClass = {
-    id: Date.now().toString(),
-    name: newClassName.value.trim(),
+    id: crypto.randomUUID(),
+    name: name,
     color: generateRandomColor()
   }
+  
+  const backup = [...projectClasses.value]
   projectClasses.value.push(newClass)
   newClassName.value = ''
   
@@ -51,10 +59,12 @@ const addClass = async () => {
     await updateProject(props.project.id, { classes: projectClasses.value })
   } catch (error) {
     console.error("Failed to update project classes:", error)
+    projectClasses.value = backup
   }
 }
 
 const removeClass = async (classId) => {
+  const backup = [...projectClasses.value]
   projectClasses.value = projectClasses.value.filter(c => c.id !== classId)
   if (activeClass.value?.id === classId) {
     activeClass.value = null
@@ -63,6 +73,7 @@ const removeClass = async (classId) => {
     await updateProject(props.project.id, { classes: projectClasses.value })
   } catch (error) {
     console.error("Failed to update project classes:", error)
+    projectClasses.value = backup
   }
 }
 
