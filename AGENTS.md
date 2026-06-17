@@ -118,7 +118,7 @@ Full local app: install dependencies manually first, then `.\scripts\start-dev.p
 
 ## Current State (Changelog) · `[KEEP UPDATED]`
 
-**Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, annotation state, and dataset version metadata. Real model training remains out of scope. Active branch `backend/implementation-v1`.
+**Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, annotation state, dataset version metadata, and interactive canvas annotation tools (Classes, BBox, Polygon, Pose Skeleton). Active branch `backend/implementation-v1`.
 
 - **2026-06-16** — Backend scaffold: FastAPI package, atomic/locked `storage.py`, Projects CRUD, `/health`, CORS (`:3000`), `lifespan`. 9 tests green.
 - **2026-06-16** — Frontend: Vue 3 + VueFlow canvas + app shell (prior work).
@@ -126,7 +126,8 @@ Full local app: install dependencies manually first, then `.\scripts\start-dev.p
 - **2026-06-17** — Added `.venv` workflow, OpenCV-backed dataset upload/video frame extraction APIs, dataset versions, and frontend API client wiring.
 - **2026-06-17** — Added Windows PowerShell dev scripts for starting/stopping backend + frontend together.
 - **2026-06-17** — Implemented embedded Annotation Workspace scaffold in frontend `ProjectView.vue`.
-**Next:** WebSocket layer, real SAM/YOLO annotation output, image serving, Ultralytics training lifecycle.
+- **2026-06-17** — Implemented Interactive Canvas Editor (Phase 2A & 2B) with native SVG overlay for Pan/Zoom, Classes CRUD, BBox, Polygon, and COCO Skeleton Template generation tools. Added Save Annotations API.
+**Next:** WebSocket layer, real SAM/YOLO auto-annotation output integration, Ultralytics training lifecycle execution.
 
 ## Documentation Maintenance
 

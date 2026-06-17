@@ -151,7 +151,7 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 
 ## Current State & Changelog  ·  `[KEEP UPDATED]`
 
-**Status:** Frontend and backend are integrated for project CRUD, dataset upload, video frame extraction, mock annotation state, and dataset version metadata. Real model training remains intentionally out of scope for this branch.
+**Status:** Frontend and backend are integrated for project CRUD, dataset upload, video frame extraction, annotation state, dataset version metadata, and interactive canvas annotation tools (Classes, BBox, Polygon, Pose Skeleton). Real model training remains intentionally out of scope for this branch.
 
 **Active branch:** `backend/implementation-v1` (pushed to `origin`; PR pending).
 
@@ -162,10 +162,11 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 - **2026-06-17** — Added `.venv` workflow, OpenCV-backed dataset upload/video frame extraction APIs, dataset version APIs, and frontend API integration.
 - **2026-06-17** — Added Windows PowerShell dev scripts for starting/stopping backend + frontend together.
 - **2026-06-17** — Implemented Assignment UI and Embedded Annotation Workspace scaffold inside frontend `ProjectView.vue`.
+- **2026-06-17** — Implemented Interactive Canvas Editor (Phase 2A & 2B) with native SVG overlay for Pan/Zoom, Classes CRUD, BBox, Polygon, and COCO Skeleton Template generation tools. Added Save Annotations API.
 
 **In development / next:**
 - WebSocket layer (training progress, playground inference).
-- Real SAM/YOLO annotation output, image serving, Ultralytics training lifecycle.
+- Real SAM/YOLO auto-annotation output integration, image serving, Ultralytics training lifecycle execution.
 
 ---
 
