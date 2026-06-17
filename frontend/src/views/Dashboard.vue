@@ -52,7 +52,6 @@
               </select>
             </label>
           </div>
-          </div>
           <button class="btn" @click="submitNewProject()">Create Project</button>
         </div>
 
