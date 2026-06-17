@@ -125,7 +125,7 @@ Full local app: install dependencies manually first, then `.\scripts\start-dev.p
 - **2026-06-17** — Added README.md; expanded AGENTS.md project sections (this block).
 - **2026-06-17** — Added `.venv` workflow, OpenCV-backed dataset upload/video frame extraction APIs, dataset versions, and frontend API client wiring.
 - **2026-06-17** — Added Windows PowerShell dev scripts for starting/stopping backend + frontend together.
-
+- **2026-06-17** — Implemented embedded Annotation Workspace scaffold in frontend `ProjectView.vue`.
 **Next:** WebSocket layer, real SAM/YOLO annotation output, image serving, Ultralytics training lifecycle.
 
 ## Documentation Maintenance

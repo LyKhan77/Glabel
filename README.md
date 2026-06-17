@@ -161,6 +161,7 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 - **2026-06-17** — Added `README.md` and expanded `AGENTS.md` project sections.
 - **2026-06-17** — Added `.venv` workflow, OpenCV-backed dataset upload/video frame extraction APIs, dataset version APIs, and frontend API integration.
 - **2026-06-17** — Added Windows PowerShell dev scripts for starting/stopping backend + frontend together.
+- **2026-06-17** — Implemented Assignment UI and Embedded Annotation Workspace scaffold inside frontend `ProjectView.vue`.
 
 **In development / next:**
 - WebSocket layer (training progress, playground inference).
