@@ -1,4 +1,6 @@
+import os
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
 from backend.schemas.dataset import (
     AutoAnnotateResponse,
@@ -8,8 +10,24 @@ from backend.schemas.dataset import (
     VersionCreate,
 )
 from backend.services import datasets as svc
+from backend.core.config import get_data_dir
 
 router = APIRouter(prefix="/api/v1/projects/{project_id}", tags=["datasets"])
+
+@router.get("/dataset/assets/{asset_id}/image")
+def get_asset_image(project_id: str, asset_id: str):
+    if not svc.project_exists(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    asset = svc.get_asset(project_id, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Image not found")
+        
+    full_path = get_data_dir() / asset["stored_path"]
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Image not found")
+        
+    return FileResponse(full_path, media_type=asset["content_type"])
 
 
 @router.post("/dataset/upload", response_model=DatasetUploadResponse, status_code=201)

@@ -59,7 +59,8 @@ def _asset(
         "filename": filename,
         "stored_path": _relative(stored_path),
         "content_type": content_type,
-        "status": "unannotated",
+        "status": "unassigned",
+        "annotations": {},
         "source_asset_id": source_asset_id,
         "created_at": timestamp,
         "updated_at": timestamp,
@@ -75,6 +76,14 @@ def list_assets(project_id: str, status: str | None = None) -> list[dict]:
     if status:
         return [asset for asset in assets if asset["status"] == status]
     return assets
+
+
+def get_asset(project_id: str, asset_id: str) -> dict | None:
+    assets = list_assets(project_id)
+    for asset in assets:
+        if asset["id"] == asset_id:
+            return asset
+    return None
 
 
 def save_uploads(project_id: str, files: list[UploadFile], extract_fps: int = 2) -> list[dict]:
@@ -114,7 +123,7 @@ def auto_annotate(project_id: str) -> tuple[int, list[dict]]:
     def mut(assets):
         changed = []
         for asset in assets:
-            if asset["status"] == "unannotated" and asset["kind"] != "video":
+            if asset["status"] == "unassigned" and asset["kind"] != "video":
                 asset["status"] = "annotated"
                 asset["updated_at"] = timestamp
                 changed.append(asset)

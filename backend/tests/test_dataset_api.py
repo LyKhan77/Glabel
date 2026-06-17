@@ -21,7 +21,7 @@ def project_id(client):
     return response.json()["id"]
 
 
-def test_upload_image_lists_unannotated_asset(client, project_id):
+def test_upload_image_lists_unassigned_asset(client, project_id):
     _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
 
     uploaded = client.post(
@@ -33,7 +33,7 @@ def test_upload_image_lists_unannotated_asset(client, project_id):
     assert uploaded.status_code == 201
     assert listed.status_code == 200
     assert listed.json()[0]["kind"] == "image"
-    assert listed.json()[0]["status"] == "unannotated"
+    assert listed.json()[0]["status"] == "unassigned"
     assert listed.json()[0]["filename"] == "sample.png"
 
 
@@ -53,10 +53,10 @@ def test_upload_video_extracts_frames(client, project_id, tmp_path):
     frames = [asset for asset in body["assets"] if asset["kind"] == "frame"]
     assert len(frames) == 2
     assert all(asset["source_asset_id"] for asset in frames)
-    assert all(asset["status"] == "unannotated" for asset in frames)
+    assert all(asset["status"] == "unassigned" for asset in frames)
 
 
-def test_auto_annotate_marks_unannotated_assets(client, project_id):
+def test_auto_annotate_marks_unassigned_assets(client, project_id):
     _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
     client.post(
         f"/api/v1/projects/{project_id}/dataset/upload",
@@ -109,3 +109,17 @@ def _write_sample_video(path: Path) -> None:
         frame = np.full((16, 16, 3), value, dtype=np.uint8)
         writer.write(frame)
     writer.release()
+
+
+def test_serve_image(client, project_id):
+    _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
+    uploaded = client.post(
+        f"/api/v1/projects/{project_id}/dataset/upload",
+        files={"files": ("sample.png", encoded.tobytes(), "image/png")},
+    )
+    asset_id = uploaded.json()["assets"][0]["id"]
+
+    response = client.get(f"/api/v1/projects/{project_id}/dataset/assets/{asset_id}/image")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert len(response.content) > 0

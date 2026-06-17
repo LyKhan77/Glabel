@@ -8,7 +8,8 @@ class DatasetAsset(BaseModel):
     filename: str
     stored_path: str
     content_type: str = ""
-    status: str = "unannotated"
+    status: str = "unassigned"
+    annotations: dict = Field(default_factory=dict)
     source_asset_id: str | None = None
     created_at: str
     updated_at: str
