@@ -36,7 +36,7 @@
         <div style="margin-bottom: 1rem;">
           <label>
             Task Type:
-            <select v-model="newProjectForm.task_type" class="austere-input">
+            <select v-model="newProjectForm.task_type" class="text-input">
               <option value="classification">Classification</option>
               <option value="object_detection">Object Detection</option>
               <option value="segmentation">Segmentation</option>
