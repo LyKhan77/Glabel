@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   API_BASE_URL,
+  assignDatasetAssets,
   autoAnnotateDataset,
   createDatasetVersion,
   getProject,
@@ -49,13 +50,16 @@ const toggleSelection = (id) => {
   }
 }
 
-const assignSelected = () => {
-  assets.value.forEach(asset => {
-    if (selectedUnassigned.value.includes(asset.id)) {
-      asset.status = 'unannotated'
-    }
-  })
-  selectedUnassigned.value = []
+const assignSelected = async () => {
+  if (!selectedUnassigned.value.length) return
+  errorMessage.value = ''
+  try {
+    await assignDatasetAssets(projectId.value, selectedUnassigned.value)
+    assets.value = await listDatasetAssets(projectId.value)
+    selectedUnassigned.value = []
+  } catch (error) {
+    errorMessage.value = 'Failed to assign selected assets.'
+  }
 }
 
 const openAnnotationWorkspace = () => {
@@ -216,7 +220,7 @@ onMounted(loadProject)
                 :class="{ selected: selectedUnassigned.includes(img.id) }"
                 @click="toggleSelection(img.id)"
               >
-                <img :src="`${API_BASE_URL}/api/v1/projects/${projectId}/dataset/assets/${img.id}/image`" class="served-image" />
+                <img :src="`${API_BASE_URL}/api/v1/projects/${projectId}/dataset/assets/${img.id}/image`" class="served-image" @error="$event.target.style.display='none'" />
                 <div class="image-label">{{ img.filename }}</div>
               </div>
               <div v-if="unassignedImages.length === 0" class="empty-state">
@@ -231,7 +235,7 @@ onMounted(loadProject)
             </div>
             <div class="image-grid">
               <div class="image-card" v-for="img in annotatingImages" :key="img.id">
-                <img :src="`${API_BASE_URL}/api/v1/projects/${projectId}/dataset/assets/${img.id}/image`" class="served-image" />
+                <img :src="`${API_BASE_URL}/api/v1/projects/${projectId}/dataset/assets/${img.id}/image`" class="served-image" @error="$event.target.style.display='none'" />
                 <div class="image-label">{{ img.filename }}</div>
                 <div class="status-badge" v-if="img.status === 'annotated'">Annotated</div>
               </div>

@@ -140,6 +140,25 @@ def auto_annotate(project_id: str) -> tuple[int, list[dict]]:
     return len(changed), changed
 
 
+def assign_assets(project_id: str, asset_ids: list[str]) -> list[dict]:
+    if not project_exists(project_id):
+        return []
+
+    timestamp = _now()
+    asset_ids_set = set(asset_ids)
+
+    def mut(assets):
+        changed = []
+        for asset in assets:
+            if asset["id"] in asset_ids_set and asset["status"] == "unassigned":
+                asset["status"] = "unannotated"
+                asset["updated_at"] = timestamp
+                changed.append(asset)
+        return changed
+
+    return update_json(_assets_file(project_id), [], mut)
+
+
 def list_versions(project_id: str) -> list[dict]:
     return read_json(_versions_file(project_id), default=[])
 

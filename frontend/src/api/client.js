@@ -59,3 +59,11 @@ export function createDatasetVersion(projectId, payload) {
     body: JSON.stringify(payload)
   })
 }
+
+export function assignDatasetAssets(projectId, assetIds) {
+  return request(`/api/v1/projects/${projectId}/dataset/assets/assign`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ asset_ids: assetIds })
+  })
+}

@@ -24,6 +24,10 @@ class AutoAnnotateResponse(BaseModel):
     assets: list[DatasetAsset]
 
 
+class AssignAssetsRequest(BaseModel):
+    asset_ids: list[str]
+
+
 class VersionCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     split: dict[str, int] = Field(default_factory=lambda: {"train": 70, "valid": 20, "test": 10})

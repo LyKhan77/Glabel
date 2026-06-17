@@ -2,6 +2,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from backend.schemas.dataset import (
+    AssignAssetsRequest,
     AutoAnnotateResponse,
     DatasetAsset,
     DatasetUploadResponse,
@@ -45,6 +46,13 @@ def list_dataset_assets(project_id: str, status: str | None = None):
     if not svc.project_exists(project_id):
         raise HTTPException(status_code=404, detail="Project not found")
     return svc.list_assets(project_id, status)
+
+
+@router.patch("/dataset/assets/assign", response_model=list[DatasetAsset])
+def assign_assets(project_id: str, payload: AssignAssetsRequest):
+    if not svc.project_exists(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    return svc.assign_assets(project_id, payload.asset_ids)
 
 
 @router.post("/dataset/auto-annotate", response_model=AutoAnnotateResponse)

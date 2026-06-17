@@ -141,3 +141,23 @@ def test_serve_image(client, project_id, tmp_path):
     assert response_404_disk.status_code == 404
     assert response_404_disk.json()["detail"] == "Image not found"
 
+
+def test_assign_assets_updates_status(client, project_id):
+    _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
+    uploaded = client.post(
+        f"/api/v1/projects/{project_id}/dataset/upload",
+        files={"files": ("sample.png", encoded.tobytes(), "image/png")},
+    )
+    asset_id = uploaded.json()["assets"][0]["id"]
+
+    assigned = client.patch(
+        f"/api/v1/projects/{project_id}/dataset/assets/assign",
+        json={"asset_ids": [asset_id]},
+    )
+
+    assert assigned.status_code == 200
+    assert len(assigned.json()) == 1
+    assert assigned.json()[0]["status"] == "unannotated"
+
+    listed = client.get(f"/api/v1/projects/{project_id}/dataset/assets")
+    assert listed.json()[0]["status"] == "unannotated"
