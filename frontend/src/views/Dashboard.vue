@@ -52,8 +52,6 @@
               </select>
             </label>
           </div>
-          <div style="margin-bottom: 1rem;">
-            <textarea v-model="newProjectForm.description" placeholder="Project Description..." class="austere-input" style="width: 100%; min-height: 100px; box-sizing: border-box;"></textarea>
           </div>
           <button class="btn" @click="submitNewProject()">Create Project</button>
         </div>
@@ -99,7 +97,7 @@ import { askGlabelAssistant } from '../api/llmService'
 const router = useRouter()
 
 const showModal = ref(false)
-const newProjectForm = ref({ name: '', description: '', task_type: 'object_detection' })
+const newProjectForm = ref({ name: '', task_type: 'object_detection' })
 const errorMessage = ref('')
 const isLoading = ref(false)
 
@@ -124,7 +122,6 @@ const askAssistant = async () => {
     // Pre-fill the form and switch to manual tab to let them review and submit
     newProjectForm.value.name = result.project_name
     newProjectForm.value.task_type = result.task_type
-    newProjectForm.value.description = assistantPrompt.value
     activeTab.value = 'manual'
   } catch (err) {
     errorMessage.value = err.message
@@ -149,17 +146,17 @@ const openProject = (id) => {
   router.push(`/project/${id}`)
 }
 
-const submitNewProject = async (taskType = 'Generated Pipeline') => {
+const submitNewProject = async () => {
   errorMessage.value = ''
-  const fallbackName = newProjectForm.value.description.trim() || taskType
+  const nameToUse = newProjectForm.value.name.trim() || newProjectForm.value.task_type
   try {
     const project = await createProject({
-      name: newProjectForm.value.name.trim() || fallbackName,
-      description: newProjectForm.value.description.trim() || taskType,
+      name: nameToUse,
+      description: "",
       task_type: newProjectForm.value.task_type
     })
     showModal.value = false
-    newProjectForm.value = { name: '', description: '', task_type: 'object_detection' }
+    newProjectForm.value = { name: '', task_type: 'object_detection' }
     router.push(`/project/${project.id}`)
   } catch (error) {
     errorMessage.value = 'Could not create project. Check backend status.'
