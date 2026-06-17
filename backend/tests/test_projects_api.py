@@ -72,3 +72,24 @@ def test_invalid_task_type_rejected(client):
         "task_type": "invalid_type"
     })
     assert response.status_code == 422
+
+
+def test_update_project_classes(client):
+    created = client.post("/api/v1/projects/", json={"name": "Proj Classes"})
+    assert created.status_code == 201
+    pid = created.json()["id"]
+
+    new_classes = [
+        {"id": "1", "name": "car", "color": "#ff0000"},
+        {"id": "2", "name": "person", "color": "#00ff00"}
+    ]
+    updated = client.patch(f"/api/v1/projects/{pid}", json={"classes": new_classes})
+    assert updated.status_code == 200
+    assert updated.json()["classes"] == new_classes
+
+    # Verify invalid class format is rejected
+    invalid_classes = [
+        {"id": "1", "name": "car"} # missing color
+    ]
+    bad_update = client.patch(f"/api/v1/projects/{pid}", json={"classes": invalid_classes})
+    assert bad_update.status_code == 422
