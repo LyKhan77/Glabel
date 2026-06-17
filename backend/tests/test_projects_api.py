@@ -52,7 +52,23 @@ def test_create_project_with_task_type(client):
     response = client.post("/api/v1/projects/", json={
         "name": "Test CV",
         "description": "Desc",
-        "task_type": "object_detection"
+        "task_type": "segmentation"
+    })
+    assert response.status_code == 201
+    assert response.json()["task_type"] == "segmentation"
+
+
+def test_create_project_default_task_type(client):
+    response = client.post("/api/v1/projects/", json={
+        "name": "Test Default"
     })
     assert response.status_code == 201
     assert response.json()["task_type"] == "object_detection"
+
+
+def test_invalid_task_type_rejected(client):
+    response = client.post("/api/v1/projects/", json={
+        "name": "Test Invalid",
+        "task_type": "invalid_type"
+    })
+    assert response.status_code == 422

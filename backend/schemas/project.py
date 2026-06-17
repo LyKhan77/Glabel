@@ -1,10 +1,16 @@
+from typing import Literal
 from pydantic import BaseModel, Field
 
 
 class ProjectBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     description: str = ""
-    task_type: str = Field(default="object_detection")  # classification, object_detection, segmentation, pose_estimation
+    task_type: Literal[
+        "classification", 
+        "object_detection", 
+        "segmentation", 
+        "pose_estimation"
+    ] = "object_detection"
 
 
 class ProjectCreate(ProjectBase):
