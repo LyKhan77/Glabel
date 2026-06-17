@@ -86,6 +86,16 @@ def get_asset(project_id: str, asset_id: str) -> dict | None:
     return None
 
 
+def get_asset_path(project_id: str, asset_id: str) -> Path | None:
+    asset = get_asset(project_id, asset_id)
+    if not asset:
+        return None
+    full_path = get_data_dir() / asset["stored_path"]
+    if full_path.exists():
+        return full_path
+    return None
+
+
 def save_uploads(project_id: str, files: list[UploadFile], extract_fps: int = 2) -> list[dict]:
     if not project_exists(project_id):
         return []

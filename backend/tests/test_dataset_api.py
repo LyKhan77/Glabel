@@ -111,7 +111,7 @@ def _write_sample_video(path: Path) -> None:
     writer.release()
 
 
-def test_serve_image(client, project_id):
+def test_serve_image(client, project_id, tmp_path):
     _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
     uploaded = client.post(
         f"/api/v1/projects/{project_id}/dataset/upload",
@@ -123,3 +123,21 @@ def test_serve_image(client, project_id):
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
     assert len(response.content) > 0
+
+    # Project not found
+    response_404_proj = client.get(f"/api/v1/projects/invalid-proj/dataset/assets/{asset_id}/image")
+    assert response_404_proj.status_code == 404
+    assert response_404_proj.json()["detail"] == "Project not found"
+
+    # Image not found (invalid asset_id)
+    response_404_asset = client.get(f"/api/v1/projects/{project_id}/dataset/assets/invalid-asset/image")
+    assert response_404_asset.status_code == 404
+    assert response_404_asset.json()["detail"] == "Image not found"
+
+    # Image not found (file deleted from disk)
+    stored_path = tmp_path / uploaded.json()["assets"][0]["stored_path"]
+    stored_path.unlink()
+    response_404_disk = client.get(f"/api/v1/projects/{project_id}/dataset/assets/{asset_id}/image")
+    assert response_404_disk.status_code == 404
+    assert response_404_disk.json()["detail"] == "Image not found"
+
