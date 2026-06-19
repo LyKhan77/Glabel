@@ -261,6 +261,7 @@ onMounted(loadProject)
           :apiBaseUrl="API_BASE_URL"
           @close="isAnnotating = false"
           @saved="refreshDatasetAssets"
+          @deleted="refreshDatasetAssets"
         />
         <div v-else class="split-view">
           <div class="pane left-pane">

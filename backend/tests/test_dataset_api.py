@@ -163,7 +163,7 @@ def test_assign_assets_updates_status(client, project_id):
     assert listed.json()[0]["status"] == "unannotated"
 
 
-def test_delete_unassigned_assets_removes_records_and_files(client, project_id, tmp_path):
+def test_delete_assets_removes_records_and_files(client, project_id, tmp_path):
     _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
     first = client.post(
         f"/api/v1/projects/{project_id}/dataset/upload",
@@ -185,11 +185,11 @@ def test_delete_unassigned_assets_removes_records_and_files(client, project_id, 
     )
 
     assert deleted.status_code == 200
-    assert [asset["id"] for asset in deleted.json()] == [first["id"]]
+    assert [asset["id"] for asset in deleted.json()] == [first["id"], second["id"]]
     listed = client.get(f"/api/v1/projects/{project_id}/dataset/assets").json()
-    assert [asset["id"] for asset in listed] == [second["id"]]
+    assert listed == []
     assert not (tmp_path / first["stored_path"]).exists()
-    assert (tmp_path / second["stored_path"]).exists()
+    assert not (tmp_path / second["stored_path"]).exists()
 
 
 def test_unassign_assets_returns_annotating_assets_to_unassigned(client, project_id):

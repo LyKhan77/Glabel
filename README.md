@@ -130,7 +130,7 @@ python -m venv .venv
 | POST | `/api/v1/projects/{id}/dataset/upload` | Upload image/video files; videos extract frames via OpenCV |
 | GET | `/api/v1/projects/{id}/dataset/assets` | List dataset assets (`?status=unannotated|annotated`) |
 | PATCH | `/api/v1/projects/{id}/dataset/assets/unassign` | Return selected annotating assets to Unassigned |
-| DELETE | `/api/v1/projects/{id}/dataset/assets` | Delete selected unassigned dataset assets |
+| DELETE | `/api/v1/projects/{id}/dataset/assets` | Delete selected dataset assets |
 | PUT | `/api/v1/projects/{id}/dataset/assets/{asset_id}/annotations` | Save asset annotations and status |
 | POST | `/api/v1/projects/{id}/dataset/auto-annotate` | Mark non-video dataset assets as annotated |
 | GET | `/api/v1/projects/{id}/versions` | List dataset versions |
@@ -174,6 +174,7 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 | **2026-06-18** | Annotation Studio | Canvas dan toolbar anotasi belum proper | Studio anotasi task-aware untuk classification, box, polygon, dan COCO pose; koordinat natural-image, undo/redo, mock AI assist, dan coverage round-trip anotasi. |
 | **2026-06-19** | Dataset Unassigned Actions | Asset unassigned harus dipilih satu-satu dan tidak bisa dihapus | Tambah Select all dan Delete untuk asset unassigned; backend menghapus record dan file asset yang masih unassigned. |
 | **2026-06-19** | Dataset Annotating Actions | Asset annotating tidak bisa dipilih untuk dikembalikan | Tambah select di pane Annotating, Return to Unassigned, dan cursor guide horizontal/vertical di canvas anotasi. |
+| **2026-06-20** | Annotation UX Polish | Anotasi perlu tombol Save dan delete ada di toolbar | Anotasi autosave, delete annotation pindah ke list Annotations, dan image di queue annotation bisa dihapus langsung. |
 
 **In development / next:**
 - WebSocket layer (training progress, playground inference).

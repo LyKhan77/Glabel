@@ -14,14 +14,13 @@ import {
   Pentagon,
   Redo2,
   RotateCcw,
-  Save,
   Trash2,
   Undo2,
   Waypoints,
   ZoomIn,
   ZoomOut
 } from 'lucide-vue-next'
-import { saveAssetAnnotations, updateProject } from '../api/client.js'
+import { deleteDatasetAssets, saveAssetAnnotations, updateProject } from '../api/client.js'
 import {
   COCO_EDGES,
   TASK_LABELS,
@@ -52,7 +51,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close', 'saved', 'deleted'])
 
 const activeQueue = ref('unannotated')
 const selectedImage = ref(null)
@@ -77,6 +76,7 @@ const cursorPoint = ref(null)
 const history = ref([])
 const redoStack = ref([])
 let resizeObserver = null
+let autosaveTimer = null
 
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 8
@@ -91,7 +91,6 @@ const selectedIndex = computed(() => currentAssets.value.findIndex((asset) => as
 const selectedAnnotations = computed(() => normalizeAnnotations(taskType.value, selectedImage.value?.annotations))
 const canUndo = computed(() => history.value.length > 0)
 const canRedo = computed(() => redoStack.value.length > 0)
-const canSave = computed(() => Boolean(selectedImage.value))
 const imageRect = computed(() => getContainedImageRect({
   viewportWidth: viewportSize.value.width,
   viewportHeight: viewportSize.value.height,
@@ -141,6 +140,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('keyup', handleKeyup)
   resizeObserver?.disconnect()
+  clearTimeout(autosaveTimer)
 })
 
 function selectAsset(asset) {
@@ -267,6 +267,7 @@ function replaceAnnotations(nextAnnotations, shouldPushHistory = true) {
   if (!selectedImage.value) return
   if (shouldPushHistory) pushHistory()
   selectedImage.value.annotations = normalizeAnnotations(taskType.value, nextAnnotations)
+  scheduleAutosave()
 }
 
 function undo() {
@@ -274,6 +275,7 @@ function undo() {
   redoStack.value.push(JSON.stringify(selectedImage.value.annotations || createEmptyAnnotations(taskType.value)))
   selectedImage.value.annotations = JSON.parse(history.value.pop())
   selectedAnnotation.value = null
+  scheduleAutosave()
 }
 
 function redo() {
@@ -281,6 +283,7 @@ function redo() {
   history.value.push(JSON.stringify(selectedImage.value.annotations || createEmptyAnnotations(taskType.value)))
   selectedImage.value.annotations = JSON.parse(redoStack.value.pop())
   selectedAnnotation.value = null
+  scheduleAutosave()
 }
 
 function handleWheel(event) {
@@ -389,6 +392,7 @@ function handleCanvasMove(event) {
 }
 
 function handleCanvasUp() {
+  const finishingEdit = interaction.value && !['pan', 'draw-box'].includes(interaction.value.type)
   if (interaction.value?.type === 'draw-box' && draftBox.value) {
     const box = clampBox(draftBox.value, imageMetrics.value.naturalWidth, imageMetrics.value.naturalHeight)
     if (box) {
@@ -404,6 +408,7 @@ function handleCanvasUp() {
     draftBox.value = null
   }
   interaction.value = null
+  if (finishingEdit) scheduleAutosave()
 }
 
 function handleCanvasLeave() {
@@ -514,23 +519,33 @@ function toggleKeypoint(skeleton, pointIndex) {
   pushHistory()
   target.keypoints[pointIndex].visible = !target.keypoints[pointIndex].visible
   selectedImage.value.annotations = annotations
+  scheduleAutosave()
 }
 
 function deleteSelected() {
   if (!selectedAnnotation.value) return
+  deleteAnnotation(selectedAnnotation.value.type, selectedAnnotation.value.id)
+}
+
+function deleteAnnotation(type, id) {
   const annotations = selectedAnnotations.value
   pushHistory()
-  if (selectedAnnotation.value.type === 'bbox') {
-    annotations.bboxes = annotations.bboxes.filter((item) => item.id !== selectedAnnotation.value.id)
+  if (type === 'classification') {
+    replaceAnnotations(createEmptyAnnotations('classification'), false)
+    return
   }
-  if (selectedAnnotation.value.type === 'polygon') {
-    annotations.polygons = annotations.polygons.filter((item) => item.id !== selectedAnnotation.value.id)
+  if (type === 'bbox') {
+    annotations.bboxes = annotations.bboxes.filter((item) => item.id !== id)
   }
-  if (selectedAnnotation.value.type === 'skeleton') {
-    annotations.skeletons = annotations.skeletons.filter((item) => item.id !== selectedAnnotation.value.id)
+  if (type === 'polygon') {
+    annotations.polygons = annotations.polygons.filter((item) => item.id !== id)
+  }
+  if (type === 'skeleton') {
+    annotations.skeletons = annotations.skeletons.filter((item) => item.id !== id)
   }
   selectedAnnotation.value = null
   selectedImage.value.annotations = annotations
+  scheduleAutosave()
 }
 
 function markNull() {
@@ -626,11 +641,30 @@ async function saveAnnotation() {
     const updatedAsset = await saveAssetAnnotations(props.project.id, selectedImage.value.id, annotations, status)
     selectedImage.value.annotations = updatedAsset.annotations
     selectedImage.value.status = updatedAsset.status
-    saveState.value = 'Saved'
+    saveState.value = 'Autosaved'
     emit('saved', updatedAsset)
   } catch (error) {
     errorMessage.value = 'Could not save annotation. Check backend status.'
     saveState.value = ''
+  }
+}
+
+function scheduleAutosave() {
+  if (!selectedImage.value) return
+  clearTimeout(autosaveTimer)
+  saveState.value = 'Saving...'
+  autosaveTimer = setTimeout(saveAnnotation, 500)
+}
+
+async function deleteAsset(event, asset) {
+  event.stopPropagation()
+  if (!window.confirm(`Delete ${asset.filename}?`)) return
+  try {
+    await deleteDatasetAssets(props.project.id, [asset.id])
+    if (selectedImage.value?.id === asset.id) selectAsset(null)
+    emit('deleted', asset)
+  } catch (error) {
+    errorMessage.value = 'Could not delete image.'
   }
 }
 
@@ -702,10 +736,6 @@ function handleKeydown(event) {
   if (event.key === 'Delete' || event.key === 'Backspace') deleteSelected()
   if (event.ctrlKey && event.key.toLowerCase() === 'z') undo()
   if ((event.ctrlKey && event.key.toLowerCase() === 'y') || (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'z')) redo()
-  if (event.ctrlKey && event.key.toLowerCase() === 's') {
-    event.preventDefault()
-    saveAnnotation()
-  }
 }
 
 function handleKeyup(event) {
@@ -743,16 +773,23 @@ function generateClassColor(index) {
       </div>
 
       <div class="asset-list">
-        <button
+        <div
           v-for="asset in currentAssets"
           :key="asset.id"
           :class="['asset-row', { selected: selectedImage?.id === asset.id }]"
-          type="button"
+          role="button"
+          tabindex="0"
           @click="selectAsset(asset)"
+          @keyup.enter="selectAsset(asset)"
         >
           <span class="asset-name">{{ asset.filename }}</span>
-          <span class="asset-status">{{ asset.status }}</span>
-        </button>
+          <span class="asset-row-footer">
+            <span class="asset-status">{{ asset.status }}</span>
+            <button class="row-delete" type="button" title="Delete image" @click="deleteAsset($event, asset)">
+              <Trash2 :size="14" />
+            </button>
+          </span>
+        </div>
         <p v-if="currentAssets.length === 0" class="empty-state">No assets in this queue.</p>
       </div>
     </aside>
@@ -799,9 +836,6 @@ function generateClassColor(index) {
           <button class="icon-btn" type="button" title="Redo" :disabled="!canRedo" @click="redo">
             <Redo2 :size="17" />
           </button>
-          <button class="icon-btn danger" type="button" title="Delete selected" :disabled="!selectedAnnotation" @click="deleteSelected">
-            <Trash2 :size="17" />
-          </button>
         </div>
 
         <div class="toolbar-spacer"></div>
@@ -814,10 +848,6 @@ function generateClassColor(index) {
           <button class="tool-btn" type="button" title="Mark this image as null/background" @click="markNull">
             <CircleDot :size="17" />
             <span>Null</span>
-          </button>
-          <button class="primary-btn" type="button" :disabled="!canSave" @click="saveAnnotation">
-            <Save :size="17" />
-            Save
           </button>
         </div>
       </div>
@@ -1047,17 +1077,22 @@ function generateClassColor(index) {
           <button class="text-btn" type="button" @click="clearAnnotations">Clear</button>
         </div>
         <div class="annotation-list">
-          <button
+          <div
             v-for="item in annotationItems()"
             :key="`${item.type}-${item.id}`"
             :class="['annotation-row', { selected: selectedAnnotation?.id === item.id || selectedAnnotations.classId === item.id }]"
-            type="button"
+            role="button"
+            tabindex="0"
             @click="item.type === 'classification' ? setClassification(item.classId) : selectAnnotation(item.type, item.id)"
+            @keyup.enter="item.type === 'classification' ? setClassification(item.classId) : selectAnnotation(item.type, item.id)"
           >
             <span class="color-dot" :style="{ backgroundColor: findClass(item.classId)?.color || item.color }"></span>
             <span>{{ findClass(item.classId)?.name || 'Unknown' }}</span>
             <span class="type-chip">{{ item.type }}</span>
-          </button>
+            <button class="row-delete" type="button" title="Delete annotation" @click.stop="deleteAnnotation(item.type, item.id)">
+              <Trash2 :size="14" />
+            </button>
+          </div>
           <p v-if="annotationItems().length === 0 && !selectedAnnotations.null" class="empty-state">No annotations yet.</p>
         </div>
       </section>
@@ -1256,6 +1291,14 @@ button:disabled {
   align-items: flex-start;
 }
 
+.asset-row-footer {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .asset-row.selected,
 .class-row.active,
 .annotation-row.selected {
@@ -1266,6 +1309,24 @@ button:disabled {
 .asset-name {
   max-width: 100%;
   overflow-wrap: anywhere;
+}
+
+.row-delete {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #ff3b30;
+}
+
+.row-delete:hover {
+  border-color: currentColor;
+  background: rgba(255, 59, 48, 0.08);
 }
 
 .studio-panel {
