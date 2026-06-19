@@ -82,6 +82,14 @@ export function assignDatasetAssets(projectId, assetIds) {
   })
 }
 
+export function unassignDatasetAssets(projectId, assetIds) {
+  return request(`/api/v1/projects/${projectId}/dataset/assets/unassign`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ asset_ids: assetIds })
+  })
+}
+
 export function deleteDatasetAssets(projectId, assetIds) {
   return request(`/api/v1/projects/${projectId}/dataset/assets`, {
     method: 'DELETE',

@@ -406,6 +406,15 @@ function handleCanvasUp() {
   interaction.value = null
 }
 
+function handleCanvasLeave() {
+  handleCanvasUp()
+  cursorPoint.value = null
+}
+
+function cursorInsideImage() {
+  return cursorPoint.value && imageMetrics.value.naturalWidth && imageMetrics.value.naturalHeight
+}
+
 function handleCanvasDblClick() {
   if (activeTool.value === 'polygon') closeDraftPolygon()
 }
@@ -822,7 +831,7 @@ function generateClassColor(index) {
           @mousedown="handleCanvasDown"
           @mousemove="handleCanvasMove"
           @mouseup="handleCanvasUp"
-          @mouseleave="handleCanvasUp"
+          @mouseleave="handleCanvasLeave"
           @dblclick="handleCanvasDblClick"
           @contextmenu.prevent
         >
@@ -842,6 +851,21 @@ function generateClassColor(index) {
               :height="viewportSize.height"
               aria-hidden="true"
             >
+              <g v-if="cursorInsideImage()" class="cursor-guide">
+                <line
+                  :x1="stageX(cursorPoint.x)"
+                  y1="0"
+                  :x2="stageX(cursorPoint.x)"
+                  :y2="viewportSize.height"
+                />
+                <line
+                  x1="0"
+                  :y1="stageY(cursorPoint.y)"
+                  :x2="viewportSize.width"
+                  :y2="stageY(cursorPoint.y)"
+                />
+              </g>
+
               <g v-for="box in selectedAnnotations.bboxes || []" :key="box.id">
                 <rect
                   v-bind="displayBox(box)"
@@ -1356,6 +1380,14 @@ button:disabled {
 .skeleton-edge {
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
+}
+
+.cursor-guide {
+  stroke: rgba(253, 252, 252, 0.38);
+  stroke-dasharray: 4 5;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
 }
 
 .null-banner,

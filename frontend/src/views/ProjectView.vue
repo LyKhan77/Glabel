@@ -10,6 +10,7 @@ import {
   getProject,
   listDatasetAssets,
   listDatasetVersions,
+  unassignDatasetAssets,
   uploadDatasetFiles
 } from '../api/client'
 import AnnotationWorkspace from '../components/AnnotationWorkspace.vue'
@@ -32,6 +33,7 @@ const showUploadModal = ref(false)
 const fileInput = ref(null)
 
 const selectedUnassigned = ref([])
+const selectedAnnotating = ref([])
 
 const onDragOver = (e) => { e.preventDefault(); isDragging.value = true }
 const onDragLeave = (e) => { e.preventDefault(); isDragging.value = false }
@@ -51,6 +53,15 @@ const toggleSelection = (id) => {
     selectedUnassigned.value.push(id)
   } else {
     selectedUnassigned.value.splice(index, 1)
+  }
+}
+
+const toggleAnnotatingSelection = (id) => {
+  const index = selectedAnnotating.value.indexOf(id)
+  if (index === -1) {
+    selectedAnnotating.value.push(id)
+  } else {
+    selectedAnnotating.value.splice(index, 1)
   }
 }
 
@@ -80,6 +91,18 @@ const deleteSelectedUnassigned = async () => {
     selectedUnassigned.value = []
   } catch (error) {
     errorMessage.value = 'Failed to delete selected assets.'
+  }
+}
+
+const returnSelectedToUnassigned = async () => {
+  if (!selectedAnnotating.value.length) return
+  errorMessage.value = ''
+  try {
+    await unassignDatasetAssets(projectId.value, selectedAnnotating.value)
+    assets.value = await listDatasetAssets(projectId.value)
+    selectedAnnotating.value = []
+  } catch (error) {
+    errorMessage.value = 'Failed to return selected assets.'
   }
 }
 
@@ -270,10 +293,19 @@ onMounted(loadProject)
           <div class="pane right-pane">
             <div class="pane-header">
               <h3>Annotating ({{ annotatingImages.length }})</h3>
-              <button class="action-btn" @click="openAnnotationWorkspace">Start Annotating</button>
+              <div class="pane-actions">
+                <button class="action-btn" @click="returnSelectedToUnassigned" :disabled="!selectedAnnotating.length">Return to Unassigned</button>
+                <button class="action-btn" @click="openAnnotationWorkspace">Start Annotating</button>
+              </div>
             </div>
             <div class="image-grid">
-              <div class="image-card" v-for="img in annotatingImages" :key="img.id">
+              <div
+                class="image-card"
+                v-for="img in annotatingImages"
+                :key="img.id"
+                :class="{ selected: selectedAnnotating.includes(img.id) }"
+                @click="toggleAnnotatingSelection(img.id)"
+              >
                 <img :src="`${API_BASE_URL}/api/v1/projects/${projectId}/dataset/assets/${img.id}/image`" class="served-image" @error="$event.target.style.display='none'" />
                 <div class="image-label">{{ img.filename }}</div>
                 <div class="status-badge" v-if="img.status === 'annotated'">Annotated</div>

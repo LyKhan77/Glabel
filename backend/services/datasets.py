@@ -159,6 +159,22 @@ def assign_assets(project_id: str, asset_ids: list[str]) -> list[dict]:
     return update_json(_assets_file(project_id), [], mut)
 
 
+def unassign_assets(project_id: str, asset_ids: list[str]) -> list[dict]:
+    timestamp = _now()
+    asset_ids_set = set(asset_ids)
+
+    def mut(assets):
+        changed = []
+        for asset in assets:
+            if asset["id"] in asset_ids_set and asset["status"] in {"unannotated", "annotated"}:
+                asset["status"] = "unassigned"
+                asset["updated_at"] = timestamp
+                changed.append(asset)
+        return changed
+
+    return update_json(_assets_file(project_id), [], mut)
+
+
 def delete_unassigned_assets(project_id: str, asset_ids: list[str]) -> list[dict]:
     asset_ids_set = set(asset_ids)
 

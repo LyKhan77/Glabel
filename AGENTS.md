@@ -29,7 +29,7 @@ Open-source, **local-first** visual pipeline builder for Computer Vision (ComfyU
 
 ## Key Features · `[KEEP UPDATED]`
 
-- Done: VueFlow node canvas, app shell, frontend/backend project integration, atomic JSON storage, Projects CRUD API, dataset upload/video frame extraction, unassigned dataset bulk select/delete, task-aware annotation studio, annotation state, dataset versions, `/health`.
+- Done: VueFlow node canvas, app shell, frontend/backend project integration, atomic JSON storage, Projects CRUD API, dataset upload/video frame extraction, unassigned dataset bulk select/delete, annotating-to-unassigned return flow, task-aware annotation studio, annotation state, dataset versions, `/health`.
 - Planned: WebSocket streaming, real SAM/YOLO annotation output, Ultralytics training lifecycle, image serving, Playground DAG execution, dataset export formats.
 
 ## Project Structure · `[KEEP UPDATED]`
@@ -132,6 +132,7 @@ Full local app: install dependencies manually first, then `.\scripts\start-dev.p
 | **2026-06-17** | Interactive Canvas Editor | *Mock overlays* statis (HTML biasa) | *Native SVG overlay* untuk *Pan/Zoom*, *Classes CRUD*, *BBox*, *Polygon*, dan *COCO Skeleton Template*. Tersedia *Save API*. |
 | **2026-06-18** | Annotation Studio | Canvas dan toolbar anotasi belum proper | Studio anotasi task-aware untuk classification, box, polygon, dan COCO pose; koordinat natural-image, undo/redo, mock AI assist, dan coverage round-trip anotasi. |
 | **2026-06-19** | Dataset Unassigned Actions | Asset unassigned harus dipilih satu-satu dan tidak bisa dihapus | Tambah Select all dan Delete untuk asset unassigned; backend menghapus record dan file asset yang masih unassigned. |
+| **2026-06-19** | Dataset Annotating Actions | Asset annotating tidak bisa dipilih untuk dikembalikan | Tambah select di pane Annotating, Return to Unassigned, dan cursor guide horizontal/vertical di canvas anotasi. |
 
 **Next:** WebSocket layer, real SAM/YOLO auto-annotation output integration, Ultralytics training lifecycle execution, dataset export formats.
 

@@ -56,6 +56,13 @@ def assign_assets(project_id: str, payload: AssignAssetsRequest):
     return svc.assign_assets(project_id, payload.asset_ids)
 
 
+@router.patch("/dataset/assets/unassign", response_model=list[DatasetAsset])
+def unassign_assets(project_id: str, payload: AssignAssetsRequest):
+    if not svc.project_exists(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    return svc.unassign_assets(project_id, payload.asset_ids)
+
+
 @router.delete("/dataset/assets", response_model=list[DatasetAsset])
 def delete_unassigned_assets(project_id: str, payload: AssignAssetsRequest):
     if not svc.project_exists(project_id):

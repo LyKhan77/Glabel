@@ -192,6 +192,29 @@ def test_delete_unassigned_assets_removes_records_and_files(client, project_id, 
     assert (tmp_path / second["stored_path"]).exists()
 
 
+def test_unassign_assets_returns_annotating_assets_to_unassigned(client, project_id):
+    _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
+    uploaded = client.post(
+        f"/api/v1/projects/{project_id}/dataset/upload",
+        files={"files": ("sample.png", encoded.tobytes(), "image/png")},
+    )
+    asset_id = uploaded.json()["assets"][0]["id"]
+    client.patch(
+        f"/api/v1/projects/{project_id}/dataset/assets/assign",
+        json={"asset_ids": [asset_id]},
+    )
+
+    unassigned = client.patch(
+        f"/api/v1/projects/{project_id}/dataset/assets/unassign",
+        json={"asset_ids": [asset_id]},
+    )
+
+    assert unassigned.status_code == 200
+    assert unassigned.json()[0]["status"] == "unassigned"
+    listed = client.get(f"/api/v1/projects/{project_id}/dataset/assets").json()
+    assert listed[0]["status"] == "unassigned"
+
+
 def test_update_asset_annotations(client, project_id):
     _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
     uploaded = client.post(
