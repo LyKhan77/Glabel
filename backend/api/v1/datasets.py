@@ -56,6 +56,13 @@ def assign_assets(project_id: str, payload: AssignAssetsRequest):
     return svc.assign_assets(project_id, payload.asset_ids)
 
 
+@router.delete("/dataset/assets", response_model=list[DatasetAsset])
+def delete_unassigned_assets(project_id: str, payload: AssignAssetsRequest):
+    if not svc.project_exists(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    return svc.delete_unassigned_assets(project_id, payload.asset_ids)
+
+
 @router.post("/dataset/auto-annotate", response_model=AutoAnnotateResponse)
 def auto_annotate_dataset(project_id: str):
     if not svc.project_exists(project_id):

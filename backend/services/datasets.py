@@ -159,6 +159,25 @@ def assign_assets(project_id: str, asset_ids: list[str]) -> list[dict]:
     return update_json(_assets_file(project_id), [], mut)
 
 
+def delete_unassigned_assets(project_id: str, asset_ids: list[str]) -> list[dict]:
+    asset_ids_set = set(asset_ids)
+
+    def mut(assets):
+        deleted = [
+            asset
+            for asset in assets
+            if asset["id"] in asset_ids_set and asset["status"] == "unassigned"
+        ]
+        assets[:] = [asset for asset in assets if asset not in deleted]
+        for asset in deleted:
+            path = get_asset_path(asset)
+            if path:
+                path.unlink(missing_ok=True)
+        return deleted
+
+    return update_json(_assets_file(project_id), [], mut)
+
+
 def list_versions(project_id: str) -> list[dict]:
     return read_json(_versions_file(project_id), default=[])
 

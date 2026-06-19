@@ -106,7 +106,7 @@ npm run preview    # preview the production build
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
 .\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload    # → http://127.0.0.1:8000
-.\.venv\Scripts\python.exe -m pytest backend/tests/ -v             # 27 tests, expect all pass
+.\.venv\Scripts\python.exe -m pytest backend/tests/ -v             # 28 tests, expect all pass
 ```
 
 **Full local app** (run from the **project root**, Windows PowerShell):
@@ -129,6 +129,7 @@ python -m venv .venv
 | DELETE | `/api/v1/projects/{id}` | Delete → 200 `{"status":"deleted","id"}` |
 | POST | `/api/v1/projects/{id}/dataset/upload` | Upload image/video files; videos extract frames via OpenCV |
 | GET | `/api/v1/projects/{id}/dataset/assets` | List dataset assets (`?status=unannotated|annotated`) |
+| DELETE | `/api/v1/projects/{id}/dataset/assets` | Delete selected unassigned dataset assets |
 | PUT | `/api/v1/projects/{id}/dataset/assets/{asset_id}/annotations` | Save asset annotations and status |
 | POST | `/api/v1/projects/{id}/dataset/auto-annotate` | Mark non-video dataset assets as annotated |
 | GET | `/api/v1/projects/{id}/versions` | List dataset versions |
@@ -170,6 +171,7 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 | **2026-06-17** | Annotation Workspace | Tampilan *Project* kosong | UI Assignment & *scaffold* Workspace di `ProjectView.vue`. |
 | **2026-06-17** | Interactive Canvas Editor | *Mock overlays* statis (HTML biasa) | *Native SVG overlay* untuk *Pan/Zoom*, *Classes CRUD*, *BBox*, *Polygon*, dan *COCO Skeleton Template*. Tersedia *Save API*. |
 | **2026-06-18** | Annotation Studio | Canvas dan toolbar anotasi belum proper | Studio anotasi task-aware untuk classification, box, polygon, dan COCO pose; koordinat natural-image, undo/redo, mock AI assist, dan coverage round-trip anotasi. |
+| **2026-06-19** | Dataset Unassigned Actions | Asset unassigned harus dipilih satu-satu dan tidak bisa dihapus | Tambah Select all dan Delete untuk asset unassigned; backend menghapus record dan file asset yang masih unassigned. |
 
 **In development / next:**
 - WebSocket layer (training progress, playground inference).

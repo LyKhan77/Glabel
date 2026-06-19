@@ -161,6 +161,37 @@ def test_assign_assets_updates_status(client, project_id):
 
     listed = client.get(f"/api/v1/projects/{project_id}/dataset/assets")
     assert listed.json()[0]["status"] == "unannotated"
+
+
+def test_delete_unassigned_assets_removes_records_and_files(client, project_id, tmp_path):
+    _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
+    first = client.post(
+        f"/api/v1/projects/{project_id}/dataset/upload",
+        files={"files": ("first.png", encoded.tobytes(), "image/png")},
+    ).json()["assets"][0]
+    second = client.post(
+        f"/api/v1/projects/{project_id}/dataset/upload",
+        files={"files": ("second.png", encoded.tobytes(), "image/png")},
+    ).json()["assets"][0]
+    client.patch(
+        f"/api/v1/projects/{project_id}/dataset/assets/assign",
+        json={"asset_ids": [second["id"]]},
+    )
+
+    deleted = client.request(
+        "DELETE",
+        f"/api/v1/projects/{project_id}/dataset/assets",
+        json={"asset_ids": [first["id"], second["id"]]},
+    )
+
+    assert deleted.status_code == 200
+    assert [asset["id"] for asset in deleted.json()] == [first["id"]]
+    listed = client.get(f"/api/v1/projects/{project_id}/dataset/assets").json()
+    assert [asset["id"] for asset in listed] == [second["id"]]
+    assert not (tmp_path / first["stored_path"]).exists()
+    assert (tmp_path / second["stored_path"]).exists()
+
+
 def test_update_asset_annotations(client, project_id):
     _, encoded = cv2.imencode(".png", np.zeros((8, 8, 3), dtype=np.uint8))
     uploaded = client.post(

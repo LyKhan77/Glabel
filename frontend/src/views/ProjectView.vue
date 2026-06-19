@@ -6,6 +6,7 @@ import {
   assignDatasetAssets,
   autoAnnotateDataset,
   createDatasetVersion,
+  deleteDatasetAssets,
   getProject,
   listDatasetAssets,
   listDatasetVersions,
@@ -42,6 +43,7 @@ const onDrop = (e) => {
 
 const unassignedImages = computed(() => assets.value.filter(asset => asset.status === 'unassigned' && asset.kind !== 'video'))
 const annotatingImages = computed(() => assets.value.filter(asset => (asset.status === 'unannotated' || asset.status === 'annotated') && asset.kind !== 'video'))
+const allUnassignedSelected = computed(() => unassignedImages.value.length > 0 && selectedUnassigned.value.length === unassignedImages.value.length)
 
 const toggleSelection = (id) => {
   const index = selectedUnassigned.value.indexOf(id)
@@ -61,6 +63,23 @@ const assignSelected = async () => {
     selectedUnassigned.value = []
   } catch (error) {
     errorMessage.value = 'Failed to assign selected assets.'
+  }
+}
+
+const toggleSelectAllUnassigned = () => {
+  selectedUnassigned.value = allUnassignedSelected.value ? [] : unassignedImages.value.map(asset => asset.id)
+}
+
+const deleteSelectedUnassigned = async () => {
+  if (!selectedUnassigned.value.length) return
+  if (!window.confirm(`Delete ${selectedUnassigned.value.length} unassigned asset(s)?`)) return
+  errorMessage.value = ''
+  try {
+    await deleteDatasetAssets(projectId.value, selectedUnassigned.value)
+    assets.value = await listDatasetAssets(projectId.value)
+    selectedUnassigned.value = []
+  } catch (error) {
+    errorMessage.value = 'Failed to delete selected assets.'
   }
 }
 
@@ -224,7 +243,13 @@ onMounted(loadProject)
           <div class="pane left-pane">
             <div class="pane-header">
               <h3>Unassigned ({{ unassignedImages.length }})</h3>
-              <button class="action-btn" @click="assignSelected" :disabled="!selectedUnassigned.length">Assign -></button>
+              <div class="pane-actions">
+                <button class="action-btn" @click="toggleSelectAllUnassigned" :disabled="!unassignedImages.length">
+                  {{ allUnassignedSelected ? 'Clear' : 'Select all' }}
+                </button>
+                <button class="action-btn danger-btn" @click="deleteSelectedUnassigned" :disabled="!selectedUnassigned.length">Delete</button>
+                <button class="action-btn" @click="assignSelected" :disabled="!selectedUnassigned.length">Assign -></button>
+              </div>
             </div>
             <div class="image-grid">
               <div 
@@ -459,6 +484,17 @@ button:hover {
 
 .pane-header h3 {
   margin: 0;
+}
+
+.pane-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.danger-btn {
+  color: #8a1f11;
 }
 
 .image-grid {

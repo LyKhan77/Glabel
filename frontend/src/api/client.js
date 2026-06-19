@@ -82,6 +82,14 @@ export function assignDatasetAssets(projectId, assetIds) {
   })
 }
 
+export function deleteDatasetAssets(projectId, assetIds) {
+  return request(`/api/v1/projects/${projectId}/dataset/assets`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ asset_ids: assetIds })
+  })
+}
+
 export function saveAssetAnnotations(projectId, assetId, annotations, status) {
   return request(`/api/v1/projects/${projectId}/dataset/assets/${assetId}/annotations`, {
     method: 'PUT',
