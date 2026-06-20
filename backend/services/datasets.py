@@ -203,11 +203,15 @@ def create_version(project_id: str, payload: VersionCreate):
         "id": str(uuid.uuid4()),
         "project_id": project_id,
         "name": payload.name,
+        "description": payload.description,
         "split": payload.split,
-        "preprocessing": payload.preprocessing,
-        "augmentations": payload.augmentations,
+        "preprocessing": [p.model_dump() for p in payload.preprocessing],
+        "augmentation_mode": payload.augmentation_mode,
+        "augmentation_preset": payload.augmentation_preset,
+        "augmentations": [a.model_dump() for a in payload.augmentations],
         "multiplier": payload.multiplier,
         "asset_count": len(annotated_assets),
+        "split_counts": {},
         "created_at": _now(),
     }
 

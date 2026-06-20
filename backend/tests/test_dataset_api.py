@@ -84,8 +84,8 @@ def test_create_and_list_dataset_versions(client, project_id):
         json={
             "name": "Version 1",
             "split": {"train": 70, "valid": 20, "test": 10},
-            "preprocessing": ["resize"],
-            "augmentations": ["flip"],
+            "preprocessing": [{"key": "resize", "enabled": True}],
+            "augmentations": [{"key": "flip", "enabled": True}],
             "multiplier": 2,
         },
     )
