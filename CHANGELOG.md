@@ -64,6 +64,47 @@ Use this structure for every new AI-agent change entry:
 
 ## AI-Agent Change Entries
 
+### 2026-06-21 - Dataset Versions Overhaul
+
+**Agent scope**
+
+- Request: Overhaul the skeletal Dataset Versions feature.
+- Intent: Provide a production-grade version management system with export formats and an interactive augmentation wizard.
+- Status: Completed.
+
+**Changed files**
+
+- `backend/schemas/dataset.py`: Added `AugmentationConfig` and `AugmentationPreviewRequest` schemas, updated Version models.
+- `backend/services/datasets.py`: Implemented robust get, delete, and create functionality including directory structure building and random dataset splitting.
+- `backend/services/export_*.py`: Created YOLO and COCO export scripts returning ZIP archives.
+- `backend/services/augmentation.py`: Created OpenCV-powered endpoints for live augmentation previews.
+- `frontend/src/components/versions/*`: Built new Vue components: `VersionWizard`, `AugmentationPreview`, `SplitBar`, `VersionCard`, and `VersionDetail` (slide-over panel).
+- `frontend/src/views/ProjectView.vue`: Integrated the new version components to replace the old inline skeleton.
+
+**Behavior before**
+
+- The dataset versions page had a skeleton 3-step inline wizard and a simple unordered list of versions. Augmentation and preprocessing were just string lists, and there was no export or split functionality.
+
+**What changed**
+
+- Introduced a full 4-step wizard (Split, Preprocessing, Augmentations, Summary).
+- Supported Basic and Advanced augmentation modes, including an OpenCV-powered preview modal.
+- Built a rich VersionCard dashboard and a slide-over VersionDetail panel.
+- Added full YOLO/COCO ZIP export capability on the backend.
+
+**After the change**
+
+- Users can confidently build robust dataset versions, visually tune augmentation parameters using sample imagery, and directly export YOLO and COCO zipped datasets.
+
+**Verification**
+
+- Run backend tests: `.\.venv\Scripts\python.exe -m pytest backend/tests/ -v` (Passed)
+- Run frontend build: `npm run build` (Passed)
+
+**Follow-up notes**
+
+- Actual image preprocessing/augmentation transforms during version generation are deferred to ML engine integration.
+
 ### 2026-06-21 - Dataset Browsing UX Pagination
 
 **Agent scope**
@@ -189,6 +230,7 @@ This table is the high-level capability map. Keep it concise but current. Detail
 
 | Area | Timeline (git) | What was developed | After the change |
 | ------ | ---------------- | -------------------- | ------------------ |
+| Dataset Versions | 2026-06-21 | 4-step Version Wizard, live augmentation preview via OpenCV, VersionCard dashboard, Slide-over detail, YOLO/COCO export API. | Robust version management, split configuration, and ZIP export. |
 | Dataset Browsing UX | 2026-06-21 | Client-side 50-image pagination, page-scoped selection, compact annotation queue rows. | Larger datasets are easier to browse and long filenames no longer dominate the annotation queue. |
 | Annotation UI/UX Enhancements | 2026-06-20 | Polygon edge insertion, skeleton movement, shortcuts modal, class recoloring. | Robust and precise annotation toolkit with better accessibility. |
 | Annotation UX Polish | 2026-06-20 | Autosave, cursor guides, delete row adjustments. | Enhanced efficiency and precision during labeling tasks. |

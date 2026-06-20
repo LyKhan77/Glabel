@@ -29,8 +29,8 @@ Open-source, **local-first** visual pipeline builder for Computer Vision (ComfyU
 
 ## Key Features · `[KEEP UPDATED]`
 
-- Done: VueFlow node canvas, app shell, frontend/backend project integration, atomic JSON storage, Projects CRUD API, dataset upload/video frame extraction, dataset bulk select/delete, annotating-to-unassigned return flow, autosaving task-aware annotation studio, annotation state, dataset versions, `/health`.
-- Planned: WebSocket streaming, real SAM/YOLO annotation output, Ultralytics training lifecycle, image serving, Playground DAG execution, dataset export formats.
+- Done: VueFlow node canvas, app shell, frontend/backend project integration, atomic JSON storage, Projects CRUD API, dataset upload/video frame extraction, dataset bulk select/delete, annotating-to-unassigned return flow, autosaving task-aware annotation studio, annotation state, dataset versions with 4-step wizard/augmentation preview/YOLO/COCO export, `/health`.
+- Planned: WebSocket streaming, real SAM/YOLO annotation output, Ultralytics training lifecycle, image serving, Playground DAG execution.
 
 ## Project Structure · `[KEEP UPDATED]`
 
@@ -128,11 +128,11 @@ Full local app: install dependencies manually first, then `.\scripts\start-dev.p
 > **CRITICAL INSTRUCTION FOR AI AGENTS:**
 > All significant changes, feature additions, and updates MUST be documented in `CHANGELOG.md` which serves as the long-term cross-agent memory. Do not add new changelog entries directly here. Instead, you must explicitly update `CHANGELOG.md` and keep this section solely as a summary and pointer.
 
-**Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, paginated dataset browsing, dataset version metadata, and a task-aware annotation studio for classification, object detection, segmentation, and COCO pose. Active branch `feat/enhance-openvision`.
+**Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, paginated dataset browsing, and a task-aware annotation studio. Dataset version management is fully robust with a 4-step wizard, interactive OpenCV augmentation preview, VersionCard dashboard, slide-over detail panel, split generation, and full YOLO/COCO ZIP exports. Active branch `feat/enhance-openvision`.
 
 **Detailed Log:** See `CHANGELOG.md` for a complete history of AI agent changes and updates.
 
-**Next:** WebSocket layer, real SAM/YOLO auto-annotation output integration, Ultralytics training lifecycle execution, dataset export formats.
+**Next:** WebSocket layer, real SAM/YOLO auto-annotation output integration, Ultralytics training lifecycle execution, image serving.
 - Sections marked `[KEEP UPDATED]` are living — edit them when the codebase changes.
 - `[DO NOT CHANGE]` command list is canonical; only change after verifying it runs.
 - README.md is the detailed canonical doc; AGENTS.md is the fast agent orientation.

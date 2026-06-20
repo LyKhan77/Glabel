@@ -46,126 +46,11 @@ The project intentionally avoids heavy infrastructure: no SQL database, no Docke
 - Backend: full Projects CRUD REST API + `/health`.
 - Frontend/backend integration for project list, create, and detail flows.
 - Backend dataset upload API with image/video ingestion and OpenCV frame extraction.
-- Backend dataset auto-annotation state transition and dataset version metadata.
+- Backend dataset auto-annotation state transition.
+- Dataset versions management with 4-step wizard, interactive augmentation preview (OpenCV), and train/valid/test split generation.
+- Full dataset export support for YOLO and COCO format in ZIP archives.
 - Dataset page with 50-image pagination for Unassigned/Annotating panes and page-scoped selection.
 - Dataset annotation studio with task-aware classification, bounding box, polygon, COCO pose tools, compact image queue, and long-filename handling.
-- Per-project local data directory (`GLABEL_DATA_DIR`), gitignored.
-
-**Planned (roadmap):**
-- WebSocket layer streaming Ultralytics training epochs / playground inference signals.
-- Real SAM/YOLO auto-annotation output and image serving.
-- Model training lifecycle and Playground DAG execution.
-- Training-time export formats for annotated datasets.
-
-## Project Structure  ·  `[KEEP UPDATED]`
-
-```
-glabel/
-├─ frontend/                  # Vue 3 + Vite + VueFlow app (dev :3000)
-│  ├─ src/
-│  │  ├─ App.vue, main.js
-│  │  ├─ api/client.js        # fetch client for FastAPI
-│  │  ├─ utils/               # annotation geometry + task helpers
-│  │  ├─ views/               # Dashboard, ModelsView, PlaygroundsDashboard,
-│  │  │                       # ProjectView, SettingsView, VisionJourney, Workspace
-│  │  ├─ components/layout/   # Sidebar
-│  │  └─ components/nodes/    # InputNode, InferenceNode, OutputNode
-│  ├─ tests/                  # Node tests for frontend utilities
-│  └─ vite.config.js          # dev server port 3000
-├─ backend/                   # FastAPI app (run from project root, :8000)
-│  ├─ main.py                 # app, lifespan, CORS, router mount, /health
-│  ├─ core/
-│  │  ├─ config.py            # get_data_dir() (env GLABEL_DATA_DIR)
-│  │  └─ storage.py           # atomic + locked JSON read/write/update
-│  ├─ api/v1/                 # thin REST routes → services
-│  ├─ services/               # CRUD, dataset ingestion, version logic
-│  ├─ schemas/                # Pydantic models
-│  ├─ tests/                  # pytest backend API/storage tests
-│  └─ requirements.txt
-├─ docs/            # plans + specs (gitignored — NOT committed)
-├─ scripts/         # local dev start/stop helpers
-├─ DESIGN.md                  # frontend visual design reference
-├─ AGENTS.md                  # agent + project operating manual
-└─ README.md                  # this file
-```
-
-## Perintah Project (Commands)  ·  `[DO NOT CHANGE — canonical, verified]`
-
-> **These commands are canonical and tested.** Do not alter them without re-verifying they work. (Per AGENTS.md rule: the command section must not be changed.)
-
-**Frontend** (run from `frontend/`):
-```bash
-cd frontend
-npm install
-npm run dev        # Vite dev server → http://localhost:3000
-npm run build      # production build → frontend/dist
-npm run preview    # preview the production build
-```
-
-**Backend** (run from the **project root**, package mode):
-```bash
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
-.\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload    # → http://127.0.0.1:8000
-.\.venv\Scripts\python.exe -m pytest backend/tests/ -v             # 29 tests, expect all pass
-```
-
-**Full local app** (run from the **project root**, Windows PowerShell):
-```powershell
-.\scripts\start-dev.ps1 # starts backend + frontend after deps are installed manually
-.\scripts\stop-dev.ps1  # stops backend + frontend started by the script
-```
-
-> Run the backend from the project root (not from inside `backend/`): the app is a package (`uvicorn backend.main:app`), so imports like `from backend.core.storage import ...` resolve correctly.
-
-## API Reference  ·  `[KEEP UPDATED]`
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/health` | Liveness probe → `{"status":"ok"}` |
-| GET | `/api/v1/projects/` | List all projects |
-| POST | `/api/v1/projects/` | Create (`{"name","description?"}`) → 201 |
-| GET | `/api/v1/projects/{id}` | Get project detail |
-| PATCH | `/api/v1/projects/{id}` | Partial update (`{"name?","description?"}`) → 200 |
-| DELETE | `/api/v1/projects/{id}` | Delete → 200 `{"status":"deleted","id"}` |
-| POST | `/api/v1/projects/{id}/dataset/upload` | Upload image/video files; videos extract frames via OpenCV |
-| GET | `/api/v1/projects/{id}/dataset/assets` | List dataset assets (`?status=unannotated|annotated`) |
-| PATCH | `/api/v1/projects/{id}/dataset/assets/unassign` | Return selected annotating assets to Unassigned |
-| DELETE | `/api/v1/projects/{id}/dataset/assets` | Delete selected dataset assets |
-| PUT | `/api/v1/projects/{id}/dataset/assets/{asset_id}/annotations` | Save asset annotations and status |
-| POST | `/api/v1/projects/{id}/dataset/auto-annotate` | Mark non-video dataset assets as annotated |
-| GET | `/api/v1/projects/{id}/versions` | List dataset versions |
-| POST | `/api/v1/projects/{id}/versions` | Create dataset version metadata |
-
-Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
-
-## Coding Conventions  ·  `[KEEP UPDATED]`
-
-- **Backend layered architecture:** `api/v1/` (thin HTTP routes) → `services/` (business logic) → `core/storage.py` (generic persistence) → `schemas/` (Pydantic shapes). Routes contain no business logic.
-- **Package mode:** backend runs as `uvicorn backend.main:app` from project root. Use absolute imports `from backend.core.storage import ...`.
-- **All state mutations go through `storage.update_json`** (atomic read-modify-write under a single lock) — never `read_json` + manual `write_json`.
-- **TDD:** write the failing test first, implement, then green. pytest + httpx `TestClient`.
-- **Config via env at call time** (`GLABEL_DATA_DIR`) so tests isolate with `monkeypatch` + `tmp_path`.
-- **Surgical, minimal changes**; match existing style; no speculative abstraction (see AGENTS.md §Simplicity / §Surgical).
-- **Commit per logical change**; never commit `docs/` plans.
-
-## Workflow  ·  `[KEEP UPDATED]`
-
-1. **Brainstorm** the feature (superpowers:brainstorming) → write a spec in `docs/superpowers/specs/`.
-2. **Plan** step-by-step (superpowers:writing-plans) → save to `docs/plans/`. *(Plans are NOT committed.)*
-3. **Execute** task-by-task (superpowers:subagent-driven-development): implementer → spec review → quality review → commit.
-4. **Finish** the branch (superpowers:finishing-a-development-branch) → push + PR.
-5. **Update docs** (README + AGENTS "Current State") as part of the change.
-
-## Current State & Changelog  ·  `[KEEP UPDATED]`
-
-**Status:** Frontend and backend are integrated for project CRUD, dataset upload, video frame extraction, paginated dataset browsing, annotation state, dataset version metadata, and interactive canvas annotation tools (Classes, BBox, Polygon, Pose Skeleton). Real model training remains intentionally out of scope for this branch.
-
-**Active branch:** `feat/enhance-openvision`.
-
-### Changelog
-| Date | Feature | Before | After |
-|---|---|---|---|
 | **2026-06-16** | Backend scaffold | Kosong | FastAPI package, atomic JSON `storage.py`, Projects CRUD, `/health`, CORS, `lifespan` placeholder. |
 | **2026-06-16** | Frontend app shell | Kosong | Vue 3 + VueFlow canvas + app shell (prior work). |
 | **2026-06-17** | Documentation | Hanya `AGENTS.md` sederhana | `README.md` lengkap dan ekstensi seksi proyek di `AGENTS.md`. |
@@ -177,6 +62,7 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 | **2026-06-19** | Dataset Annotating Actions | Asset annotating tidak bisa dipilih untuk dikembalikan | Tambah select di pane Annotating, Return to Unassigned, dan cursor guide horizontal/vertical di canvas anotasi. |
 | **2026-06-20** | Annotation UX Polish | Anotasi perlu tombol Save dan delete ada di toolbar | Anotasi autosave, delete annotation pindah ke list Annotations, dan image di queue annotation bisa dihapus langsung. |
 | **2026-06-21** | Dataset Browsing UX | Dataset panes merender semua asset dan queue annotation boros ruang untuk filename panjang | Tambah pagination 50 image/page, Select page, filename clamp/ellipsis, dan queue annotation compact. |
+| **2026-06-21** | Dataset Versions Overhaul | Fitur Dataset Versions berupa list statis dan form kosong | Implementasi 4-step Version Wizard, OpenCV augmentation preview, VersionCard, VersionDetail slide-over, split logic, dan full YOLO/COCO export ke ZIP. |
 
 **In development / next:**
 - WebSocket layer (training progress, playground inference).
