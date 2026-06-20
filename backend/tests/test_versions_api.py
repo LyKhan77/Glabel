@@ -14,7 +14,10 @@ def client(monkeypatch, tmp_path):
 
 @pytest.fixture
 def project_id(client):
-    response = client.post("/api/v1/projects/", json={"name": "Dataset Project"})
+    response = client.post("/api/v1/projects/", json={
+        "name": "Dataset Project",
+        "classes": [{"id": "cls_person", "name": "person", "color": "#000000"}]
+    })
     assert response.status_code == 201
     return response.json()["id"]
 
@@ -104,4 +107,99 @@ def test_create_version_builds_folder_structure(client, project_id, tmp_path):
     assert (version_dir / "test" / "images").exists()
     assert (version_dir / "test" / "labels").exists()
     assert (version_dir / "version_meta.json").exists()
+
+
+def test_export_yolo(client, project_id):
+    _upload_and_annotate(client, project_id)
+    assets = client.get(f"/api/v1/projects/{project_id}/dataset/assets").json()
+    asset_id = assets[0]["id"]
+    client.put(f"/api/v1/projects/{project_id}/dataset/assets/{asset_id}/annotations", json={
+        "status": "annotated",
+        "annotations": {
+            "objects": [{"class": "person", "bbox": [10, 10, 40, 40]}]
+        }
+    })
+    
+    created = client.post(
+        f"/api/v1/projects/{project_id}/versions",
+        json={"name": "Version 1", "split": {"train": 100, "valid": 0, "test": 0}}
+    )
+    version_id = created.json()["id"]
+
+    resp = client.post(f"/api/v1/projects/{project_id}/versions/{version_id}/export?format=yolo")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/zip"
+    
+    import zipfile
+    import io
+    z = zipfile.ZipFile(io.BytesIO(resp.content))
+    namelist = z.namelist()
+    assert "data.yaml" in namelist
+    assert any(name.startswith("train/images/") for name in namelist)
+    assert any(name.startswith("train/labels/") for name in namelist)
+
+
+def test_export_coco(client, project_id):
+    _upload_and_annotate(client, project_id)
+    assets = client.get(f"/api/v1/projects/{project_id}/dataset/assets").json()
+    asset_id = assets[0]["id"]
+    client.put(f"/api/v1/projects/{project_id}/dataset/assets/{asset_id}/annotations", json={
+        "status": "annotated",
+        "annotations": {
+            "objects": [{"class": "person", "bbox": [10, 10, 40, 40]}]
+        }
+    })
+    
+    created = client.post(
+        f"/api/v1/projects/{project_id}/versions",
+        json={"name": "Version 1", "split": {"train": 100, "valid": 0, "test": 0}}
+    )
+    version_id = created.json()["id"]
+
+    resp = client.post(f"/api/v1/projects/{project_id}/versions/{version_id}/export?format=coco")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/zip"
+    
+    import zipfile
+    import io
+    z = zipfile.ZipFile(io.BytesIO(resp.content))
+    namelist = z.namelist()
+    assert "train/annotations.json" in namelist
+
+
+def test_export_invalid_format(client, project_id):
+    _upload_and_annotate(client, project_id)
+    created = client.post(
+        f"/api/v1/projects/{project_id}/versions",
+        json={"name": "Version 1"}
+    )
+    version_id = created.json()["id"]
+
+    resp = client.post(f"/api/v1/projects/{project_id}/versions/{version_id}/export?format=invalid")
+    assert resp.status_code == 422  # format fails regex pattern validation
+def test_preview_augmentation_rotation(client, project_id):
+    _upload_and_annotate(client, project_id)
+    response = client.post(
+        f"/api/v1/projects/{project_id}/dataset/preview-augmentation",
+        json={"augmentation_key": "rotation", "params": {"degrees": 15}}
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+
+
+def test_preview_augmentation_invalid_key(client, project_id):
+    _upload_and_annotate(client, project_id)
+    response = client.post(
+        f"/api/v1/projects/{project_id}/dataset/preview-augmentation",
+        json={"augmentation_key": "nonexistent_key"}
+    )
+    assert response.status_code == 400
+
+
+def test_preview_augmentation_no_assets(client, project_id):
+    response = client.post(
+        f"/api/v1/projects/{project_id}/dataset/preview-augmentation",
+        json={"augmentation_key": "rotation"}
+    )
+    assert response.status_code == 400
 

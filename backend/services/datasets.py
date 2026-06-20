@@ -13,6 +13,10 @@ from backend.core.config import get_data_dir
 from backend.core.storage import read_json, update_json
 from backend.schemas.dataset import VersionCreate
 from backend.services.projects import get_project
+from backend.services.export_yolo import generate_yolo_labels, generate_data_yaml
+from backend.services.export_coco import generate_coco_annotations
+import io
+import zipfile
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 VIDEO_EXTENSIONS = {".avi", ".mov", ".mp4", ".mkv", ".webm"}
@@ -359,3 +363,43 @@ def update_annotations(project_id: str, asset_id: str, annotations: dict, status
         return None
         
     return update_json(_assets_file(project_id), [], mut)
+
+
+def export_version(project_id: str, version_id: str, format: str) -> io.BytesIO | None:
+    project = get_project(project_id)
+    if not project:
+        return None
+    version = get_version(project_id, version_id)
+    if not version:
+        return None
+    
+    version_dir = _project_dir(project_id) / "versions" / version_id
+    meta_path = version_dir / "version_meta.json"
+    if not meta_path.exists():
+        return None
+        
+    with meta_path.open("r") as f:
+        version_meta = json.load(f)
+        
+    class_list = project.get("classes", [])
+    
+    if format == "yolo":
+        generate_yolo_labels(version_dir, version_meta, class_list)
+        generate_data_yaml(version_dir, version["name"], class_list)
+    elif format == "coco":
+        generate_coco_annotations(version_dir, version_meta, class_list)
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+        
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in version_dir.walk():
+            for file in files:
+                if file == "version_meta.json":
+                    continue
+                file_path = root / file
+                rel_path = file_path.relative_to(version_dir)
+                zf.write(file_path, arcname=rel_path)
+                
+    buffer.seek(0)
+    return buffer
