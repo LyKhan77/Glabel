@@ -364,24 +364,7 @@ onUnmounted(() => {
 
 .range-slider {
   width: 100%;
-  appearance: none;
-  background: transparent;
   cursor: pointer;
-}
-
-.range-slider::-webkit-slider-runnable-track {
-  background: var(--hairline);
-  height: 4px;
-  border-radius: 2px;
-}
-
-.range-slider::-webkit-slider-thumb {
-  appearance: none;
-  margin-top: -6px;
-  background: var(--text-color);
-  height: 16px;
-  width: 8px;
-  border-radius: 2px;
 }
 
 .modal-footer {

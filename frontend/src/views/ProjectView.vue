@@ -423,7 +423,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEsc))
         </div>
         
         <div v-if="showWizard">
-          <VersionWizard @generate="handleGenerateVersion" @cancel="showWizard = false" :projectId="projectId" />
+          <VersionWizard 
+            @generate="handleGenerateVersion" 
+            @cancel="showWizard = false" 
+            :projectId="projectId" 
+            :annotatedCount="annotatingImages.filter(i => i.status === 'annotated').length"
+            :existingVersionCount="versions.length"
+          />
         </div>
         <div v-else>
           <div style="margin-bottom: 1.5rem;">

@@ -27,18 +27,26 @@
       <div class="split-inputs">
         <div class="input-group">
           <label>Train (%)</label>
-          <input type="number" v-model.number="splitTrain" class="text-input" />
+          <div class="slider-row">
+            <input type="range" v-model.number="splitTrain" min="0" max="100" class="split-slider" />
+            <input type="number" v-model.number="splitTrain" min="0" max="100" class="text-input small" />
+          </div>
         </div>
         <div class="input-group">
           <label>Validation (%)</label>
-          <input type="number" v-model.number="splitValid" class="text-input" />
+          <div class="slider-row">
+            <input type="range" v-model.number="splitValid" min="0" max="100" class="split-slider" />
+            <input type="number" v-model.number="splitValid" min="0" max="100" class="text-input small" />
+          </div>
         </div>
         <div class="input-group">
           <label>Test (%)</label>
-          <input type="number" v-model.number="splitTest" class="text-input" />
+          <div class="slider-row">
+            <input type="range" v-model.number="splitTest" min="0" max="100" class="split-slider" />
+            <input type="number" v-model.number="splitTest" min="0" max="100" class="text-input small" />
+          </div>
         </div>
       </div>
-      <div v-if="splitError" class="error-text">{{ splitError }}</div>
     </div>
 
     <!-- Step 2: Preprocessing -->
@@ -50,9 +58,9 @@
       
       <div class="options-list">
         <div v-for="(prep, idx) in preprocessingOptions" :key="prep.key" class="option-row" :class="{ active: prep.enabled }">
-          <div class="option-header" @click="prep.enabled = !prep.enabled">
+          <div class="option-header" @click="prep.enabled = !prep.enabled" :title="hoverTips[prep.key]">
             <span class="bracket">{{ prep.enabled ? '[x]' : '[ ]' }}</span>
-            <label class="option-label">
+            <label class="option-label" :title="hoverTips[prep.key]">
               {{ prep.key.replace('_', ' ') }}
             </label>
           </div>
@@ -106,9 +114,9 @@
         <div class="options-list">
           <div v-for="(aug, idx) in augmentationOptions" :key="aug.key" class="option-row" :class="{ active: aug.enabled }">
             <div class="option-header-row">
-              <div class="option-header" @click="aug.enabled = !aug.enabled">
+              <div class="option-header" @click="aug.enabled = !aug.enabled" :title="hoverTips[aug.key]">
                 <span class="bracket">{{ aug.enabled ? '[x]' : '[ ]' }}</span>
-                <label class="option-label">
+                <label class="option-label" :title="hoverTips[aug.key]">
                   {{ aug.key.replace('_', ' ') }}
                 </label>
               </div>
@@ -189,7 +197,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import SplitBar from './SplitBar.vue'
 import AugmentationPreview from './AugmentationPreview.vue'
 
@@ -201,18 +209,54 @@ const props = defineProps({
 
 const emit = defineEmits(['generate', 'cancel'])
 
+const hoverTips = {
+  auto_orient: 'Fixes image orientation based on EXIF data',
+  resize: 'Resizes all images to standard dimensions',
+  grayscale: 'Converts images to black and white',
+  auto_contrast: 'Automatically adjusts contrast to maximize range',
+  filter_null: 'Removes images that lack annotations',
+  flip_horizontal: 'Mirrors images horizontally',
+  flip_vertical: 'Mirrors images vertically',
+  rotation: 'Rotates images randomly up to the specified degrees',
+  brightness: 'Adjusts brightness up or down randomly',
+  blur: 'Applies Gaussian blur to reduce sharp details',
+  noise: 'Adds random salt and pepper noise',
+  cutout: 'Adds random black boxes to obscure parts of the image',
+  hsv_shift: 'Randomly shifts Hue, Saturation, and Value'
+}
+
 const steps = ['Split', 'Preprocessing', 'Augmentations', 'Summary']
 const currentStep = ref(1)
 
 const splitTrain = ref(70)
 const splitValid = ref(20)
 const splitTest = ref(10)
-const splitError = computed(() => {
-  if (splitTrain.value + splitValid.value + splitTest.value !== 100) {
-    return 'Total split must equal 100%'
+
+watch(splitTrain, (newVal) => {
+  let remainder = 100 - newVal
+  if (splitValid.value > remainder) {
+    splitValid.value = remainder
   }
-  return null
+  splitTest.value = 100 - splitTrain.value - splitValid.value
 })
+
+watch(splitValid, (newVal) => {
+  let remainder = 100 - newVal
+  if (splitTrain.value > remainder) {
+    splitTrain.value = remainder
+  }
+  splitTest.value = 100 - splitTrain.value - splitValid.value
+})
+
+watch(splitTest, (newVal) => {
+  let remainder = 100 - newVal
+  if (splitTrain.value > remainder) {
+    splitTrain.value = remainder
+  }
+  splitValid.value = 100 - splitTrain.value - splitTest.value
+})
+
+const splitError = computed(() => null) // Removed as auto-adjust guarantees 100%
 
 const preprocessingOptions = ref([
   { key: 'auto_orient', enabled: true, params: {} },
@@ -383,6 +427,16 @@ function generate() {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 24px;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.split-slider {
+  flex-grow: 1;
 }
 
 .input-group {
