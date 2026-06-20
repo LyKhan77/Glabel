@@ -111,7 +111,7 @@ watch(() => props.visible, async (newVal) => {
     if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
     previewUrl.value = null
   }
-})
+}, { immediate: true })
 
 async function fetchOriginal() {
   try {

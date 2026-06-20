@@ -62,6 +62,7 @@
             <span class="bracket">{{ prep.enabled ? '[x]' : '[ ]' }}</span>
             <label class="option-label" :title="hoverTips[prep.key]">
               {{ prep.key.replace('_', ' ') }}
+              <span class="help-icon" :title="hoverTips[prep.key]">[?]</span>
             </label>
           </div>
           <div v-if="prep.enabled && Object.keys(prep.params).length > 0" class="option-params">
@@ -118,6 +119,7 @@
                 <span class="bracket">{{ aug.enabled ? '[x]' : '[ ]' }}</span>
                 <label class="option-label" :title="hoverTips[aug.key]">
                   {{ aug.key.replace('_', ' ') }}
+                  <span class="help-icon" :title="hoverTips[aug.key]">[?]</span>
                 </label>
               </div>
               <button v-if="aug.enabled" @click="openPreview(aug)" class="preview-btn">
@@ -210,19 +212,19 @@ const props = defineProps({
 const emit = defineEmits(['generate', 'cancel'])
 
 const hoverTips = {
-  auto_orient: 'Fixes image orientation based on EXIF data',
-  resize: 'Resizes all images to standard dimensions',
-  grayscale: 'Converts images to black and white',
-  auto_contrast: 'Automatically adjusts contrast to maximize range',
-  filter_null: 'Removes images that lack annotations',
-  flip_horizontal: 'Mirrors images horizontally',
-  flip_vertical: 'Mirrors images vertically',
-  rotation: 'Rotates images randomly up to the specified degrees',
-  brightness: 'Adjusts brightness up or down randomly',
-  blur: 'Applies Gaussian blur to reduce sharp details',
-  noise: 'Adds random salt and pepper noise',
-  cutout: 'Adds random black boxes to obscure parts of the image',
-  hsv_shift: 'Randomly shifts Hue, Saturation, and Value'
+  auto_orient: 'Fixes image orientation based on EXIF data. Required for mobile uploads to prevent sideways images.',
+  resize: 'Resizes all images to 640x640 (standard for YOLO). Recommended to reduce training memory.',
+  grayscale: 'Converts images to single-channel black and white. Useful if color is irrelevant to your classes.',
+  auto_contrast: 'Automatically adjusts contrast to maximize dynamic range using histogram equalization.',
+  filter_null: 'Removes images that lack any bounding box or polygon annotations to prevent background bias.',
+  flip_horizontal: 'Mirrors images horizontally. Useful for symmetric objects like cars or faces.',
+  flip_vertical: 'Mirrors images vertically. Use only if upside-down orientations occur in the real world.',
+  rotation: 'Rotates images randomly up to the specified degrees to improve model rotational invariance.',
+  brightness: 'Adjusts brightness up or down randomly. Helps the model generalize to different lighting conditions.',
+  blur: 'Applies Gaussian blur to reduce sharp details. Simulates out-of-focus camera conditions.',
+  noise: 'Adds random salt and pepper noise. Forces the model to learn robust features instead of exact pixels.',
+  cutout: 'Adds random black boxes to obscure parts of the image, simulating object occlusion.',
+  hsv_shift: 'Randomly shifts Hue, Saturation, and Value. Highly recommended for robustness against color variations.'
 }
 
 const steps = ['Split', 'Preprocessing', 'Augmentations', 'Summary']
@@ -517,6 +519,20 @@ function generate() {
 
 .option-label {
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.help-icon {
+  font-family: 'Berkeley Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--mute);
+  cursor: help;
+}
+
+.help-icon:hover {
+  color: var(--text-color);
 }
 
 .option-params {
