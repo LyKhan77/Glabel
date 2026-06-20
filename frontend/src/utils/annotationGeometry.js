@@ -165,3 +165,15 @@ export function createPoseSkeleton({ id, classId, color, center }) {
 export function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
+
+// Nearest point on segment ab to p, with projection param t (0..1) and distance.
+export function pointOnSegment(p, a, b) {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const lenSq = dx * dx + dy * dy
+  let t = lenSq === 0 ? 0 : ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq
+  t = clamp(t, 0, 1)
+  const x = a.x + t * dx
+  const y = a.y + t * dy
+  return { x, y, t, dist: Math.hypot(p.x - x, p.y - y) }
+}

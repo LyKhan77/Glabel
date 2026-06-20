@@ -106,6 +106,11 @@ Full local app: install dependencies manually first, then `.\scripts\start-dev.p
 
 - Layering: `api/v1` (thin routes) → `services` (logic) → `core/storage` (persistence) → `schemas`. No business logic in routes.
 - Backend is a package: run `uvicorn backend.main:app` from project root; absolute imports `from backend.core...`.
+
+## Coding Conventions · `[KEEP UPDATED]`
+
+- Layering: `api/v1` (thin routes) → `services` (logic) → `core/storage` (persistence) → `schemas`. No business logic in routes.
+- Backend is a package: run `uvicorn backend.main:app` from project root; absolute imports `from backend.core...`.
 - Mutate state only via `storage.update_json` (atomic read-modify-write under one lock).
 - TDD: failing test → implement → green (pytest + httpx TestClient).
 - Config via env at call time (`GLABEL_DATA_DIR`); tests isolate with `monkeypatch` + `tmp_path`.
@@ -120,25 +125,14 @@ Full local app: install dependencies manually first, then `.\scripts\start-dev.p
 
 ## Current State (Changelog) · `[KEEP UPDATED]`
 
+> **CRITICAL INSTRUCTION FOR AI AGENTS:**
+> All significant changes, feature additions, and updates MUST be documented in `CHANGELOG.md` which serves as the long-term cross-agent memory. Do not add new changelog entries directly here. Instead, you must explicitly update `CHANGELOG.md` and keep this section solely as a summary and pointer.
+
 **Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, dataset version metadata, and a task-aware annotation studio for classification, object detection, segmentation, and COCO pose. Active branch `feat/enhance-openvision`.
 
-| Date | Feature | Before | After |
-|---|---|---|---|
-| **2026-06-16** | Backend scaffold | Kosong | FastAPI package, atomic JSON `storage.py`, Projects CRUD, `/health`, CORS, `lifespan` placeholder. |
-| **2026-06-16** | Frontend app shell | Kosong | Vue 3 + VueFlow canvas + app shell (prior work). |
-| **2026-06-17** | Documentation | Hanya `AGENTS.md` sederhana | `README.md` lengkap dan ekstensi seksi proyek di `AGENTS.md`. |
-| **2026-06-17** | Dataset APIs & Scripts | Upload belum didukung | API *upload* OpenCV, *video frame extraction*, *PowerShell scripts*, dan integrasi API *frontend*. |
-| **2026-06-17** | Annotation Workspace | Tampilan *Project* kosong | UI Assignment & *scaffold* Workspace di `ProjectView.vue`. |
-| **2026-06-17** | Interactive Canvas Editor | *Mock overlays* statis (HTML biasa) | *Native SVG overlay* untuk *Pan/Zoom*, *Classes CRUD*, *BBox*, *Polygon*, dan *COCO Skeleton Template*. Tersedia *Save API*. |
-| **2026-06-18** | Annotation Studio | Canvas dan toolbar anotasi belum proper | Studio anotasi task-aware untuk classification, box, polygon, dan COCO pose; koordinat natural-image, undo/redo, mock AI assist, dan coverage round-trip anotasi. |
-| **2026-06-19** | Dataset Unassigned Actions | Asset unassigned harus dipilih satu-satu dan tidak bisa dihapus | Tambah Select all dan Delete untuk asset unassigned; backend menghapus record dan file asset yang masih unassigned. |
-| **2026-06-19** | Dataset Annotating Actions | Asset annotating tidak bisa dipilih untuk dikembalikan | Tambah select di pane Annotating, Return to Unassigned, dan cursor guide horizontal/vertical di canvas anotasi. |
-| **2026-06-20** | Annotation UX Polish | Anotasi perlu tombol Save dan delete ada di toolbar | Anotasi autosave, delete annotation pindah ke list Annotations, dan image di queue annotation bisa dihapus langsung. |
+**Detailed Log:** See `CHANGELOG.md` for a complete history of AI agent changes and updates.
 
 **Next:** WebSocket layer, real SAM/YOLO auto-annotation output integration, Ultralytics training lifecycle execution, dataset export formats.
-
-## Documentation Maintenance
-
 - Sections marked `[KEEP UPDATED]` are living — edit them when the codebase changes.
 - `[DO NOT CHANGE]` command list is canonical; only change after verifying it runs.
 - README.md is the detailed canonical doc; AGENTS.md is the fast agent orientation.

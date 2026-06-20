@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   API_BASE_URL,
@@ -175,16 +175,23 @@ const uploadFiles = async (files) => {
 // Versions state
 const versions = ref([])
 const wizardStep = ref(0)
+const splitTrain = ref(70)
+const splitValid = ref(20)
+const splitTest = ref(10)
+const preprocessing = ref(['resize'])
+const augmentations = ref(['flip'])
+const multiplier = ref(1)
+const splitTotal = computed(() => splitTrain.value + splitValid.value + splitTest.value)
 
 const generateVersion = async () => {
   errorMessage.value = ''
   try {
     await createDatasetVersion(projectId.value, {
       name: 'Version ' + (versions.value.length + 1),
-      split: { train: 70, valid: 20, test: 10 },
-      preprocessing: ['resize'],
-      augmentations: ['flip'],
-      multiplier: 1
+      split: { train: splitTrain.value, valid: splitValid.value, test: splitTest.value },
+      preprocessing: [...preprocessing.value],
+      augmentations: [...augmentations.value],
+      multiplier: multiplier.value
     })
     versions.value = await listDatasetVersions(projectId.value)
     wizardStep.value = 0
@@ -215,7 +222,15 @@ const testInPlayground = () => {
   router.push('/playgrounds')
 }
 
-onMounted(loadProject)
+function handleEsc(event) {
+  if (event.key === 'Escape' && showUploadModal.value) showUploadModal.value = false
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleEsc)
+  loadProject()
+})
+onBeforeUnmount(() => window.removeEventListener('keydown', handleEsc))
 </script>
 
 <template>
@@ -276,15 +291,20 @@ onMounted(loadProject)
               </div>
             </div>
             <div class="image-grid">
-              <div 
-                class="image-card" 
-                v-for="img in unassignedImages" 
+              <div
+                class="image-card"
+                v-for="img in unassignedImages"
                 :key="img.id"
                 :class="{ selected: selectedUnassigned.includes(img.id) }"
+                role="button"
+                tabindex="0"
+                :aria-pressed="selectedUnassigned.includes(img.id)"
                 @click="toggleSelection(img.id)"
+                @keyup.enter="toggleSelection(img.id)"
               >
                 <img :src="`${API_BASE_URL}/api/v1/projects/${projectId}/dataset/assets/${img.id}/image`" class="served-image" @error="$event.target.style.display='none'" />
                 <div class="image-label">{{ img.filename }}</div>
+                <div v-if="selectedUnassigned.includes(img.id)" class="select-tick" aria-hidden="true">✓</div>
               </div>
               <div v-if="unassignedImages.length === 0" class="empty-state">
                 No unassigned images.
@@ -305,11 +325,16 @@ onMounted(loadProject)
                 v-for="img in annotatingImages"
                 :key="img.id"
                 :class="{ selected: selectedAnnotating.includes(img.id) }"
+                role="button"
+                tabindex="0"
+                :aria-pressed="selectedAnnotating.includes(img.id)"
                 @click="toggleAnnotatingSelection(img.id)"
+                @keyup.enter="toggleAnnotatingSelection(img.id)"
               >
                 <img :src="`${API_BASE_URL}/api/v1/projects/${projectId}/dataset/assets/${img.id}/image`" class="served-image" @error="$event.target.style.display='none'" />
                 <div class="image-label">{{ img.filename }}</div>
                 <div class="status-badge" v-if="img.status === 'annotated'">Annotated</div>
+                <div v-if="selectedAnnotating.includes(img.id)" class="select-tick" aria-hidden="true">✓</div>
               </div>
               <div v-if="annotatingImages.length === 0" class="empty-state">
                 No images being annotated.
@@ -327,20 +352,25 @@ onMounted(loadProject)
         
         <div v-if="wizardStep > 0" class="wizard-container">
           <div v-if="wizardStep === 1" class="wizard-step">
-            <p>Train/Valid/Test Split (70/20/10)</p>
-            <button class="action-btn" @click="wizardStep = 2">[Next]</button>
+            <p>Train / Valid / Test split <span class="split-total" :class="{ invalid: splitTotal !== 100 }">(sum {{ splitTotal }}%)</span></p>
+            <div class="split-inputs">
+              <label>Train <input type="number" min="0" max="100" v-model.number="splitTrain" class="number-input" />%</label>
+              <label>Valid <input type="number" min="0" max="100" v-model.number="splitValid" class="number-input" />%</label>
+              <label>Test <input type="number" min="0" max="100" v-model.number="splitTest" class="number-input" />%</label>
+            </div>
+            <button class="action-btn" @click="wizardStep = 2" :disabled="splitTotal !== 100">[Next]</button>
           </div>
           <div v-if="wizardStep === 2" class="wizard-step">
             <p>Preprocessing</p>
-            <label><input type="checkbox" /> Resize</label>
-            <label><input type="checkbox" /> Grayscale</label>
+            <label><input type="checkbox" value="resize" v-model="preprocessing" /> Resize</label>
+            <label><input type="checkbox" value="grayscale" v-model="preprocessing" /> Grayscale</label>
             <button class="action-btn" @click="wizardStep = 3">[Next]</button>
           </div>
           <div v-if="wizardStep === 3" class="wizard-step">
             <p>Augmentations</p>
-            <label><input type="checkbox" /> Flip</label>
-            <label><input type="checkbox" /> Rotate</label>
-            <p>Multiplier: <input type="number" value="1" min="1" class="number-input" /></p>
+            <label><input type="checkbox" value="flip" v-model="augmentations" /> Flip</label>
+            <label><input type="checkbox" value="rotate" v-model="augmentations" /> Rotate</label>
+            <p>Multiplier: <input type="number" min="1" v-model.number="multiplier" class="number-input" /></p>
             <button class="action-btn" @click="generateVersion">[Generate]</button>
           </div>
         </div>
@@ -387,7 +417,7 @@ onMounted(loadProject)
     </main>
 
     <!-- Upload Media Modal -->
-    <div v-if="showUploadModal" class="modal-overlay">
+    <div v-if="showUploadModal" class="modal-overlay" @click.self="showUploadModal = false">
       <div class="modal-content">
         <div class="modal-header">
           <h3>Upload Media</h3>
@@ -460,12 +490,14 @@ button {
   cursor: pointer;
 }
 
-button:hover {
-  text-decoration: underline;
+.nav-btn, .tab-btn, .subtab-btn, .action-btn {
+  min-height: 34px;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
 }
 
-.nav-btn, .tab-btn, .subtab-btn, .action-btn {
-  padding: 0.25rem 0.5rem;
+.nav-btn:hover, .tab-btn:hover, .action-btn:hover {
+  background: var(--hover-bg);
 }
 
 .tab-btn.active, .subtab-btn.active {
@@ -550,8 +582,28 @@ button:hover {
 }
 
 .image-card.selected {
-  border-color: #fdfcfc;
-  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--text-color);
+  background: var(--hover-bg);
+  box-shadow: inset 0 0 0 2px var(--text-color);
+}
+
+.select-tick {
+  position: absolute;
+  top: 0.3rem;
+  left: 0.3rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  display: grid;
+  place-items: center;
+  background: var(--text-color);
+  color: var(--bg-color);
+  font-size: 0.75rem;
+  border-radius: 4px;
+}
+
+.image-card:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .served-image {
@@ -629,6 +681,37 @@ button:disabled {
   align-items: flex-start;
 }
 
+.wizard-step label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.split-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.split-inputs label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.split-inputs .number-input {
+  width: 4rem;
+}
+
+.split-total {
+  color: var(--mute);
+  font-weight: 700;
+}
+
+.split-total.invalid {
+  color: var(--danger);
+}
+
 .number-input, .select-input {
   font-family: inherit;
   font-size: inherit;
@@ -685,7 +768,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
 }
 
 .modal-content {

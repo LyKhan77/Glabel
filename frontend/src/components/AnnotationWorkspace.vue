@@ -9,6 +9,7 @@ import {
   CircleDot,
   Crosshair,
   Hand,
+  HelpCircle,
   Maximize2,
   MousePointer2,
   Pentagon,
@@ -23,6 +24,7 @@ import {
 import { deleteDatasetAssets, saveAssetAnnotations, updateProject } from '../api/client.js'
 import {
   COCO_EDGES,
+  COCO_KEYPOINTS,
   TASK_LABELS,
   clamp,
   clampBox,
@@ -32,7 +34,8 @@ import {
   getTaskTools,
   isAnnotationComplete,
   normalizeAnnotations,
-  pointerToImagePoint
+  pointerToImagePoint,
+  pointOnSegment
 } from '../utils/annotationGeometry.js'
 
 const props = defineProps({
@@ -73,13 +76,21 @@ const interaction = ref(null)
 const draftBox = ref(null)
 const draftPolygon = ref(null)
 const cursorPoint = ref(null)
+const selectedVertex = ref(null)
+const insertHint = ref(null)
+const labeledKeypoint = ref(null)
 const history = ref([])
 const redoStack = ref([])
+const showShortcuts = ref(false)
+const queueQuery = ref('')
 let resizeObserver = null
 let autosaveTimer = null
 
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 8
+const MIN_POLYGON_POINTS = 3
+const CLOSE_TOLERANCE_PX = 8
+const INSERT_TOLERANCE_PX = 6
 
 const taskType = computed(() => props.project.task_type || 'object_detection')
 const taskLabel = computed(() => TASK_LABELS[taskType.value] || taskType.value)
@@ -87,6 +98,11 @@ const taskTools = computed(() => getTaskTools(taskType.value))
 const unannotatedAssets = computed(() => props.assets.filter((asset) => asset.status !== 'annotated'))
 const annotatedAssets = computed(() => props.assets.filter((asset) => asset.status === 'annotated'))
 const currentAssets = computed(() => activeQueue.value === 'annotated' ? annotatedAssets.value : unannotatedAssets.value)
+const filteredAssets = computed(() => {
+  const query = queueQuery.value.trim().toLowerCase()
+  if (!query) return currentAssets.value
+  return currentAssets.value.filter((asset) => asset.filename.toLowerCase().includes(query))
+})
 const selectedIndex = computed(() => currentAssets.value.findIndex((asset) => asset.id === selectedImage.value?.id))
 const selectedAnnotations = computed(() => normalizeAnnotations(taskType.value, selectedImage.value?.annotations))
 const canUndo = computed(() => history.value.length > 0)
@@ -115,6 +131,17 @@ const canvasCursor = computed(() => {
 const selectedDetail = computed(() => {
   if (!selectedAnnotation.value) return null
   return findAnnotation(selectedAnnotation.value)
+})
+const hintText = computed(() => {
+  if (activeTool.value === 'bbox') return 'Drag to draw box'
+  if (activeTool.value === 'polygon') return 'Click points, then click the first point to close'
+  if (activeTool.value === 'select' && taskType.value === 'segmentation' && (selectedAnnotations.value.polygons || []).length) {
+    return 'Click an edge to add a point · select a point + Delete to remove'
+  }
+  if (activeTool.value === 'select' && taskType.value === 'pose_estimation' && (selectedAnnotations.value.skeletons || []).length) {
+    return 'Drag joints · drag box/bone moves whole · hover for name · dbl-click toggles visibility'
+  }
+  return ''
 })
 
 watch(() => props.assets, () => {
@@ -149,6 +176,9 @@ function selectAsset(asset) {
   draftBox.value = null
   draftPolygon.value = null
   cursorPoint.value = null
+  selectedVertex.value = null
+  insertHint.value = null
+  labeledKeypoint.value = null
   history.value = []
   redoStack.value = []
   saveState.value = ''
@@ -332,6 +362,10 @@ function handleCanvasDown(event) {
         points: []
       }
     }
+    if (draftPolygon.value.points.length >= MIN_POLYGON_POINTS && nearFirstPoint(point)) {
+      closeDraftPolygon()
+      return
+    }
     draftPolygon.value.points.push(point)
     cursorPoint.value = point
   }
@@ -350,6 +384,17 @@ function handleCanvasMove(event) {
   }
 
   if (!point || !selectedImage.value) return
+
+  if (activeTool.value === 'select' && !interaction.value) {
+    let hint = null
+    for (const polygon of selectedAnnotations.value.polygons || []) {
+      const ins = findEdgeInsertionIn(point, polygon)
+      if (ins && (!hint || ins.dist < hint.dist)) hint = { id: polygon.id, point: ins.point, dist: ins.dist }
+    }
+    insertHint.value = hint
+  } else if (insertHint.value) {
+    insertHint.value = null
+  }
 
   if (interaction.value?.type === 'draw-box' && draftBox.value) {
     draftBox.value.x = Math.min(draftBox.value.startX, point.x)
@@ -386,6 +431,22 @@ function handleCanvasMove(event) {
     if (skeleton?.keypoints[interaction.value.pointIndex]) {
       skeleton.keypoints[interaction.value.pointIndex].x = point.x
       skeleton.keypoints[interaction.value.pointIndex].y = point.y
+      selectedImage.value.annotations = selectedAnnotations.value
+    }
+  }
+
+  if (interaction.value?.type === 'move-skeleton') {
+    const skeleton = selectedAnnotations.value.skeletons.find((item) => item.id === interaction.value.id)
+    if (skeleton) {
+      const dx = point.x - interaction.value.startPoint.x
+      const dy = point.y - interaction.value.startPoint.y
+      const w = imageMetrics.value.naturalWidth
+      const h = imageMetrics.value.naturalHeight
+      skeleton.keypoints.forEach((kp, i) => {
+        const start = interaction.value.startPoints[i]
+        kp.x = clamp(Math.round(start.x + dx), 0, w)
+        kp.y = clamp(Math.round(start.y + dy), 0, h)
+      })
       selectedImage.value.annotations = selectedAnnotations.value
     }
   }
@@ -426,7 +487,7 @@ function handleCanvasDblClick() {
 
 function closeDraftPolygon() {
   if (!draftPolygon.value) return
-  if (draftPolygon.value.points.length >= 3) {
+  if (draftPolygon.value.points.length >= MIN_POLYGON_POINTS) {
     const annotations = selectedAnnotations.value
     annotations.polygons.push({
       ...draftPolygon.value,
@@ -436,6 +497,13 @@ function closeDraftPolygon() {
   }
   draftPolygon.value = null
   cursorPoint.value = null
+}
+
+// ponytail: image-space distance, screen tolerance scaled by current zoom+fit
+function nearFirstPoint(point) {
+  const first = draftPolygon.value.points[0]
+  const tolerance = CLOSE_TOLERANCE_PX / (imageRect.value.scale * zoom.value)
+  return Math.hypot(point.x - first.x, point.y - first.y) <= tolerance
 }
 
 function cancelDraft() {
@@ -449,8 +517,21 @@ function selectAnnotation(type, id) {
   selectedAnnotation.value = { type, id }
 }
 
+// In a drawing tool, let mousedown bubble to the canvas so a new shape can be
+// started on top of an existing annotation. Only capture (stop + act) in select mode.
+function guardSelect(event) {
+  if (activeTool.value !== 'select') return false
+  event.stopPropagation()
+  return true
+}
+
+function selectOnCanvas(event, type, id) {
+  if (!guardSelect(event)) return
+  selectAnnotation(type, id)
+}
+
 function startBoxMove(event, box) {
-  if (activeTool.value !== 'select') return
+  if (!guardSelect(event)) return
   const point = pointFromEvent(event)
   if (!point) return
   selectAnnotation('bbox', box.id)
@@ -464,6 +545,7 @@ function startBoxMove(event, box) {
 }
 
 function startBoxResize(event, box, handle) {
+  if (!guardSelect(event)) return
   const point = pointFromEvent(event)
   if (!point) return
   selectAnnotation('bbox', box.id)
@@ -498,18 +580,94 @@ function resizeBox(point) {
   selectedImage.value.annotations = annotations
 }
 
-function startPolygonPointMove(event, polygon, pointIndex) {
-  if (activeTool.value !== 'select') return
+function findEdgeInsertionIn(point, polygon) {
+  const tolerance = INSERT_TOLERANCE_PX / (imageRect.value.scale * zoom.value)
+  const pts = polygon.points
+  let best = null
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]
+    const b = pts[(i + 1) % pts.length]
+    const proj = pointOnSegment(point, a, b)
+    if (proj.dist <= tolerance && (!best || proj.dist < best.dist)) {
+      best = { index: i + 1, point: { x: Math.round(proj.x), y: Math.round(proj.y) }, dist: proj.dist }
+    }
+  }
+  return best
+}
+
+// ponytail: scoped to clicked polygon; the <polygon> element is the hit target,
+// so we intercept its mousedown to insert on edge before it becomes a selection.
+function onPolygonMouseDown(event, polygon) {
+  if (!guardSelect(event)) return
+  const point = pointFromEvent(event)
+  if (point) {
+    const ins = findEdgeInsertionIn(point, polygon)
+    if (ins) {
+      pushHistory()
+      polygon.points.splice(ins.index, 0, ins.point)
+      selectedAnnotation.value = { type: 'polygon', id: polygon.id }
+      selectedVertex.value = { id: polygon.id, pointIndex: ins.index }
+      selectedImage.value.annotations = selectedAnnotations.value
+      insertHint.value = null
+      scheduleAutosave()
+      return
+    }
+  }
   selectAnnotation('polygon', polygon.id)
+}
+
+function deleteSelectedVertex() {
+  const sel = selectedVertex.value
+  if (!sel) return false
+  const polygon = selectedAnnotations.value.polygons.find((item) => item.id === sel.id)
+  selectedVertex.value = null
+  if (!polygon || polygon.points.length <= MIN_POLYGON_POINTS) return true
+  pushHistory()
+  polygon.points.splice(sel.pointIndex, 1)
+  selectedImage.value.annotations = selectedAnnotations.value
+  scheduleAutosave()
+  return true
+}
+
+function startPolygonPointMove(event, polygon, pointIndex) {
+  if (!guardSelect(event)) return
+  selectAnnotation('polygon', polygon.id)
+  selectedVertex.value = { id: polygon.id, pointIndex }
   pushHistory()
   interaction.value = { type: 'move-polygon-point', id: polygon.id, pointIndex }
 }
 
 function startKeypointMove(event, skeleton, pointIndex) {
-  if (activeTool.value !== 'select') return
+  if (!guardSelect(event)) return
   selectAnnotation('skeleton', skeleton.id)
   pushHistory()
   interaction.value = { type: 'move-keypoint', id: skeleton.id, pointIndex }
+}
+
+function skeletonStageBox(skeleton) {
+  const xs = skeleton.keypoints.map((k) => k.x)
+  const ys = skeleton.keypoints.map((k) => k.y)
+  const pad = 8 / zoom.value
+  return {
+    x: stageX(Math.min(...xs)) - pad,
+    y: stageY(Math.min(...ys)) - pad,
+    width: stageWidth(Math.max(...xs) - Math.min(...xs)) + pad * 2,
+    height: stageWidth(Math.max(...ys) - Math.min(...ys)) + pad * 2
+  }
+}
+
+function startSkeletonMove(event, skeleton) {
+  if (!guardSelect(event)) return
+  selectAnnotation('skeleton', skeleton.id)
+  const point = pointFromEvent(event)
+  if (!point) return
+  pushHistory()
+  interaction.value = {
+    type: 'move-skeleton',
+    id: skeleton.id,
+    startPoint: point,
+    startPoints: skeleton.keypoints.map((k) => ({ x: k.x, y: k.y }))
+  }
 }
 
 function toggleKeypoint(skeleton, pointIndex) {
@@ -697,6 +855,41 @@ async function removeClass(classId) {
   }
 }
 
+function recolorAnnotations(classId, color) {
+  if (!selectedImage.value) return
+  const annotations = selectedAnnotations.value
+  let changed = false
+  const apply = (items = []) => {
+    for (const item of items) {
+      if (item.classId === classId && item.color !== color) {
+        item.color = color
+        changed = true
+      }
+    }
+  }
+  apply(annotations.bboxes)
+  apply(annotations.polygons)
+  apply(annotations.skeletons)
+  if (changed) {
+    selectedImage.value.annotations = annotations
+    scheduleAutosave()
+  }
+}
+
+async function updateClassColor(classId, color) {
+  const target = projectClasses.value.find((item) => item.id === classId)
+  if (!target || target.color === color) return
+  const backup = projectClasses.value.map((item) => ({ ...item }))
+  target.color = color
+  recolorAnnotations(classId, color)
+  try {
+    await updateProject(props.project.id, { classes: projectClasses.value })
+  } catch (error) {
+    projectClasses.value = backup
+    errorMessage.value = 'Could not save class color.'
+  }
+}
+
 function findClass(classId) {
   return projectClasses.value.find((item) => item.id === classId)
 }
@@ -723,17 +916,42 @@ function annotationItems() {
 
 function handleKeydown(event) {
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
+
+  if (event.key === '?' || event.key === '/') {
+    showShortcuts.value = !showShortcuts.value
+    return
+  }
+  if (event.key === 'Escape') {
+    if (showShortcuts.value) { showShortcuts.value = false; return }
+    cancelDraft()
+    return
+  }
   if (event.code === 'Space') {
     isSpaceDown.value = true
     event.preventDefault()
+    return
   }
+  if (/^[1-9]$/.test(event.key)) {
+    const cls = projectClasses.value[Number(event.key) - 1]
+    if (!cls) return
+    if (taskType.value === 'classification') setClassification(cls.id)
+    else activeClass.value = cls
+    return
+  }
+  if (event.key === 'Backspace' && draftPolygon.value?.points.length) {
+    draftPolygon.value.points.pop()
+    if (!draftPolygon.value.points.length) draftPolygon.value = null
+    return
+  }
+
   if (event.key.toLowerCase() === 'v') activeTool.value = 'select'
   if (event.key.toLowerCase() === 'b' && taskType.value === 'object_detection') activeTool.value = 'bbox'
   if (event.key.toLowerCase() === 'p' && taskType.value === 'segmentation') activeTool.value = 'polygon'
   if (event.key.toLowerCase() === 'k' && taskType.value === 'pose_estimation') activeTool.value = 'pose'
-  if (event.key === 'Enter' && draftPolygon.value) closeDraftPolygon()
-  if (event.key === 'Escape') cancelDraft()
-  if (event.key === 'Delete' || event.key === 'Backspace') deleteSelected()
+  if (event.key === 'Delete' || event.key === 'Backspace') {
+    if (deleteSelectedVertex()) return
+    deleteSelected()
+  }
   if (event.ctrlKey && event.key.toLowerCase() === 'z') undo()
   if ((event.ctrlKey && event.key.toLowerCase() === 'y') || (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'z')) redo()
 }
@@ -772,9 +990,13 @@ function generateClassColor(index) {
         </button>
       </div>
 
+      <div class="queue-search-wrap">
+        <input v-model="queueQuery" type="search" class="queue-search" placeholder="Search filename…" />
+      </div>
+
       <div class="asset-list">
         <div
-          v-for="asset in currentAssets"
+          v-for="asset in filteredAssets"
           :key="asset.id"
           :class="['asset-row', { selected: selectedImage?.id === asset.id }]"
           role="button"
@@ -782,6 +1004,7 @@ function generateClassColor(index) {
           @click="selectAsset(asset)"
           @keyup.enter="selectAsset(asset)"
         >
+          <img :src="getImageUrl(asset)" class="queue-thumb" loading="lazy" draggable="false" alt="" />
           <span class="asset-name">{{ asset.filename }}</span>
           <span class="asset-row-footer">
             <span class="asset-status">{{ asset.status }}</span>
@@ -791,6 +1014,7 @@ function generateClassColor(index) {
           </span>
         </div>
         <p v-if="currentAssets.length === 0" class="empty-state">No assets in this queue.</p>
+        <p v-else-if="filteredAssets.length === 0" class="empty-state">No match for "{{ queueQuery }}".</p>
       </div>
     </aside>
 
@@ -849,6 +1073,9 @@ function generateClassColor(index) {
             <CircleDot :size="17" />
             <span>Null</span>
           </button>
+          <button class="icon-btn" type="button" title="Shortcuts (?)" @click="showShortcuts = !showShortcuts">
+            <HelpCircle :size="17" />
+          </button>
         </div>
       </div>
 
@@ -896,12 +1123,28 @@ function generateClassColor(index) {
                 />
               </g>
 
+              <g v-if="insertHint && activeTool === 'select'" class="insert-hint">
+                <circle :cx="stageX(insertHint.point.x)" :cy="stageY(insertHint.point.y)" :r="5 / zoom" />
+                <line
+                  :x1="stageX(insertHint.point.x) - 3 / zoom"
+                  :y1="stageY(insertHint.point.y)"
+                  :x2="stageX(insertHint.point.x) + 3 / zoom"
+                  :y2="stageY(insertHint.point.y)"
+                />
+                <line
+                  :x1="stageX(insertHint.point.x)"
+                  :y1="stageY(insertHint.point.y) - 3 / zoom"
+                  :x2="stageX(insertHint.point.x)"
+                  :y2="stageY(insertHint.point.y) + 3 / zoom"
+                />
+              </g>
+
               <g v-for="box in selectedAnnotations.bboxes || []" :key="box.id">
                 <rect
                   v-bind="displayBox(box)"
                   :class="['annotation-box', { selected: selectedAnnotation?.id === box.id }]"
                   :stroke="box.color"
-                  @mousedown.stop="startBoxMove($event, box)"
+                  @mousedown="startBoxMove($event, box)"
                 />
                 <text :x="displayBox(box).x" :y="displayBox(box).y - 6" :fill="box.color" class="label-text">
                   {{ findClass(box.classId)?.name || 'Unknown' }}
@@ -913,8 +1156,8 @@ function generateClassColor(index) {
                     class="resize-handle"
                     :cx="handle.includes('w') ? displayBox(box).x : displayBox(box).x + displayBox(box).width"
                     :cy="handle.includes('n') ? displayBox(box).y : displayBox(box).y + displayBox(box).height"
-                    r="5"
-                    @mousedown.stop="startBoxResize($event, box, handle)"
+                    :r="4 / zoom"
+                    @mousedown="startBoxResize($event, box, handle)"
                   />
                 </g>
               </g>
@@ -931,7 +1174,7 @@ function generateClassColor(index) {
                   :points="displayPoints(polygon.points)"
                   :class="['annotation-polygon', { selected: selectedAnnotation?.id === polygon.id }]"
                   :stroke="polygon.color"
-                  @mousedown.stop="selectAnnotation('polygon', polygon.id)"
+                  @mousedown="onPolygonMouseDown($event, polygon)"
                 />
                 <text
                   v-if="polygon.points.length"
@@ -945,11 +1188,11 @@ function generateClassColor(index) {
                 <circle
                   v-for="(point, pointIndex) in polygon.points"
                   :key="`${polygon.id}-${pointIndex}`"
-                  class="vertex-handle"
+                  :class="['vertex-handle', { 'vertex-selected': selectedVertex?.id === polygon.id && selectedVertex?.pointIndex === pointIndex }]"
                   :cx="stageX(point.x)"
                   :cy="stageY(point.y)"
-                  r="5"
-                  @mousedown.stop="startPolygonPointMove($event, polygon, pointIndex)"
+                  :r="4 / zoom"
+                  @mousedown="startPolygonPointMove($event, polygon, pointIndex)"
                 />
               </g>
 
@@ -970,11 +1213,34 @@ function generateClassColor(index) {
                   class="vertex-handle"
                   :cx="stageX(point.x)"
                   :cy="stageY(point.y)"
-                  r="4"
+                  :r="3 / zoom"
+                />
+                <circle
+                  v-if="draftPolygon.points.length >= MIN_POLYGON_POINTS"
+                  class="vertex-close"
+                  :cx="stageX(draftPolygon.points[0].x)"
+                  :cy="stageY(draftPolygon.points[0].y)"
+                  :r="5 / zoom"
                 />
               </g>
 
               <g v-for="skeleton in selectedAnnotations.skeletons || []" :key="skeleton.id">
+                <rect
+                  v-if="selectedAnnotation?.id === skeleton.id"
+                  v-bind="skeletonStageBox(skeleton)"
+                  class="skeleton-move-box"
+                  @mousedown="startSkeletonMove($event, skeleton)"
+                />
+                <line
+                  v-for="(edge, edgeIndex) in COCO_EDGES"
+                  :key="`${skeleton.id}-hit-${edgeIndex}`"
+                  class="skeleton-edge-hit"
+                  :x1="stageX(skeleton.keypoints[edge[0]].x)"
+                  :y1="stageY(skeleton.keypoints[edge[0]].y)"
+                  :x2="stageX(skeleton.keypoints[edge[1]].x)"
+                  :y2="stageY(skeleton.keypoints[edge[1]].y)"
+                  @mousedown="startSkeletonMove($event, skeleton)"
+                />
                 <line
                   v-for="(edge, edgeIndex) in COCO_EDGES"
                   :key="`${skeleton.id}-edge-${edgeIndex}`"
@@ -992,17 +1258,29 @@ function generateClassColor(index) {
                   :fill="skeleton.color"
                   :cx="stageX(keypoint.x)"
                   :cy="stageY(keypoint.y)"
-                  r="5"
-                  @mousedown.stop="startKeypointMove($event, skeleton, pointIndex)"
+                  :r="4 / zoom"
+                  @mousedown="startKeypointMove($event, skeleton, pointIndex)"
+                  @mouseenter="labeledKeypoint = { id: skeleton.id, index: pointIndex }"
+                  @mouseleave="labeledKeypoint = null"
                   @dblclick.stop="toggleKeypoint(skeleton, pointIndex)"
                 />
+                <text
+                  v-if="labeledKeypoint?.id === skeleton.id"
+                  :x="stageX(skeleton.keypoints[labeledKeypoint.index].x) + 6"
+                  :y="stageY(skeleton.keypoints[labeledKeypoint.index].y) - 6"
+                  :fill="skeleton.color"
+                  class="label-text"
+                  pointer-events="none"
+                >
+                  {{ COCO_KEYPOINTS[labeledKeypoint.index] }}
+                </text>
                 <text
                   v-if="skeleton.keypoints.length"
                   :x="stageX(skeleton.keypoints[0].x)"
                   :y="stageY(skeleton.keypoints[0].y) - 10"
                   :fill="skeleton.color"
                   class="label-text"
-                  @mousedown.stop="selectAnnotation('skeleton', skeleton.id)"
+                  @mousedown="selectOnCanvas($event, 'skeleton', skeleton.id)"
                 >
                   {{ findClass(skeleton.classId)?.name || 'Unknown' }}
                 </text>
@@ -1014,9 +1292,9 @@ function generateClassColor(index) {
             <Check :size="16" />
             Marked as null/background
           </div>
-          <div v-if="activeTool === 'bbox' || activeTool === 'polygon'" class="crosshair-hint">
+          <div v-if="hintText" class="crosshair-hint">
             <Crosshair :size="16" />
-            {{ activeTool === 'bbox' ? 'Drag to draw box' : 'Click points, Enter to close' }}
+            {{ hintText }}
           </div>
         </div>
 
@@ -1046,14 +1324,24 @@ function generateClassColor(index) {
         </div>
         <div class="class-list">
           <button
-            v-for="item in projectClasses"
+            v-for="(item, classIndex) in projectClasses"
             :key="item.id"
             :class="['class-row', { active: activeClass?.id === item.id || selectedAnnotations.classId === item.id }]"
             type="button"
             @click="taskType === 'classification' ? setClassification(item.id) : activeClass = item"
           >
-            <span class="color-dot" :style="{ backgroundColor: item.color }"></span>
+            <label class="color-dot-wrap" :title="'Change color'">
+              <span class="color-dot" :style="{ backgroundColor: item.color }"></span>
+              <input
+                type="color"
+                class="color-input"
+                :value="item.color"
+                aria-label="Class color"
+                @change="updateClassColor(item.id, $event.target.value)"
+              />
+            </label>
             <span>{{ item.name }}</span>
+            <span v-if="classIndex < 9" class="hotkey-badge">{{ classIndex + 1 }}</span>
             <Trash2 :size="14" class="row-action" @click.stop="removeClass(item.id)" />
           </button>
           <p v-if="projectClasses.length === 0" class="empty-state">Create a class before labeling.</p>
@@ -1127,6 +1415,28 @@ function generateClassColor(index) {
         </dl>
       </section>
     </aside>
+
+    <div v-if="showShortcuts" class="shortcut-overlay" @click.self="showShortcuts = false">
+      <div class="shortcut-panel" role="dialog" aria-label="Keyboard shortcuts">
+        <div class="shortcut-head">
+          <strong>Shortcuts</strong>
+          <button class="text-btn" type="button" @click="showShortcuts = false">[esc]</button>
+        </div>
+        <dl class="shortcut-list">
+          <div><dt>V</dt><dd>Select tool</dd></div>
+          <div><dt>B</dt><dd>Box</dd></div>
+          <div><dt>P</dt><dd>Polygon</dd></div>
+          <div><dt>K</dt><dd>Pose</dd></div>
+          <div><dt>1–9</dt><dd>Active class</dd></div>
+          <div><dt>Space</dt><dd>Pan (hold)</dd></div>
+          <div><dt>⌫</dt><dd>Drop last point · delete vertex / shape</dd></div>
+          <div><dt>Ctrl+Z</dt><dd>Undo</dd></div>
+          <div><dt>Ctrl+Y</dt><dd>Redo</dd></div>
+          <div><dt>Esc</dt><dd>Cancel / close panel</dd></div>
+          <div><dt>?</dt><dd>This panel</dd></div>
+        </dl>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1199,12 +1509,12 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  border: 1px solid var(--border-color, #646262);
+  border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
   color: inherit;
   padding: 0.25rem 0.55rem;
-  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+  transition: background 160ms ease, color 160ms ease;
 }
 
 .icon-btn {
@@ -1222,7 +1532,7 @@ button:disabled {
 .tool-btn:hover,
 .icon-btn:hover,
 .icon-text-btn:hover {
-  background: rgba(15, 0, 0, 0.06);
+  background: var(--hover-bg);
 }
 
 .tool-btn.active,
@@ -1348,6 +1658,11 @@ button:disabled {
   gap: 0.35rem;
 }
 
+.toolbar-group + .toolbar-group {
+  padding-left: 0.45rem;
+  border-left: 1px solid var(--hairline, rgba(15, 0, 0, 0.12));
+}
+
 .toolbar-spacer {
   flex: 1;
 }
@@ -1395,20 +1710,20 @@ button:disabled {
 .annotation-box,
 .annotation-polygon {
   fill: rgba(255, 255, 255, 0.09);
-  stroke-width: 2;
+  stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
   pointer-events: auto;
 }
 
 .annotation-box.selected,
 .annotation-polygon.selected {
-  stroke-width: 3;
+  stroke-width: 2;
 }
 
 .draft-shape,
 .draft-line {
   fill: rgba(255, 255, 255, 0.06);
-  stroke-width: 2;
+  stroke-width: 1.5;
   stroke-dasharray: 6;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
@@ -1438,15 +1753,54 @@ button:disabled {
   opacity: 0.35;
 }
 
+.vertex-selected {
+  fill: var(--accent, #007aff);
+}
+
+.insert-hint circle,
+.insert-hint line {
+  fill: none;
+  stroke: var(--text-color, #201d1d);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 .skeleton-edge {
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
 
+.skeleton-edge-hit {
+  stroke: transparent;
+  stroke-width: 12;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+}
+
+.skeleton-move-box {
+  fill: transparent;
+  stroke: var(--mute, #6e6e73);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+  pointer-events: auto;
+}
+
+.vertex-close {
+  fill: none;
+  stroke: #fdfcfc;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 .cursor-guide {
-  stroke: rgba(253, 252, 252, 0.38);
+  /* difference blend inverts against any backdrop: visible on dark canvas and white image alike */
+  stroke: #ffffff;
   stroke-dasharray: 4 5;
   stroke-width: 1;
+  mix-blend-mode: difference;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
@@ -1529,6 +1883,29 @@ button:disabled {
   flex: 0 0 12px;
   border: 1px solid currentColor;
   border-radius: 999px;
+  pointer-events: none;
+}
+
+.color-dot-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  cursor: pointer;
+}
+
+.color-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 .full-width {
@@ -1584,6 +1961,94 @@ button:disabled {
 
 .error-text {
   color: #ff3b30;
+}
+
+.queue-search-wrap {
+  padding: 0.45rem;
+  border-bottom: 1px dashed var(--border-color, #646262);
+}
+
+.queue-search {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 30px;
+  border: 1px solid var(--border-color, #646262);
+  border-radius: 4px;
+  background: var(--surface-soft, #f8f7f7);
+  color: inherit;
+  padding: 0.3rem 0.45rem;
+  font: inherit;
+}
+
+.queue-thumb {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--surface-soft, #f8f7f7);
+}
+
+.hotkey-badge {
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  min-width: 16px;
+  border: 1px solid var(--hairline, rgba(15, 0, 0, 0.12));
+  border-radius: 4px;
+  font-size: 0.7rem;
+  color: var(--mute, #6e6e73);
+  text-align: center;
+}
+
+.shortcut-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal, 1000);
+  display: grid;
+  place-items: center;
+  background: rgba(32, 29, 29, 0.5);
+  padding: 1rem;
+}
+
+.shortcut-panel {
+  width: min(420px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--bg-color, #fdfcfc);
+  border: 1px solid var(--border-color, #646262);
+  border-radius: 4px;
+  padding: 1rem;
+}
+
+.shortcut-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--border-color, #646262);
+}
+
+.shortcut-list {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.shortcut-list div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.shortcut-list dt {
+  flex: 0 0 64px;
+  margin: 0;
+  color: var(--mute, #6e6e73);
+}
+
+.shortcut-list dd {
+  margin: 0;
 }
 
 @media (max-width: 1024px) {
