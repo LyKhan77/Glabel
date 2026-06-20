@@ -1,6 +1,8 @@
+import random
 import re
 import shutil
 import uuid
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -194,13 +196,40 @@ def list_versions(project_id: str) -> list[dict]:
     return read_json(_versions_file(project_id), default=[])
 
 
+def get_version(project_id: str, version_id: str) -> dict | None:
+    versions = list_versions(project_id)
+    for version in versions:
+        if version["id"] == version_id:
+            return version
+    return None
+
+
+def delete_version(project_id: str, version_id: str) -> dict | None:
+    def mut(versions):
+        for i, version in enumerate(versions):
+            if version["id"] == version_id:
+                deleted = versions.pop(i)
+                # Remove version directory
+                version_dir = _project_dir(project_id) / "versions" / version_id
+                if version_dir.exists():
+                    shutil.rmtree(version_dir)
+                return deleted
+        return None
+
+    return update_json(_versions_file(project_id), [], mut)
+
+
 def create_version(project_id: str, payload: VersionCreate):
     if not project_exists(project_id):
         return None
 
     annotated_assets = list_assets(project_id, status="annotated")
+    if not annotated_assets:
+        raise ValueError("No annotated assets to version")
+
+    version_id = str(uuid.uuid4())
     version = {
-        "id": str(uuid.uuid4()),
+        "id": version_id,
         "project_id": project_id,
         "name": payload.name,
         "description": payload.description,
@@ -214,6 +243,62 @@ def create_version(project_id: str, payload: VersionCreate):
         "split_counts": {},
         "created_at": _now(),
     }
+
+    # Shuffle and split
+    random.seed(42)  # For reproducibility, though might want a different strategy
+    shuffled_assets = list(annotated_assets)
+    random.shuffle(shuffled_assets)
+
+    total_split_weight = sum(payload.split.values())
+    if total_split_weight == 0:
+        split_ratios = {"train": 1.0, "valid": 0.0, "test": 0.0}
+    else:
+        split_ratios = {k: v / total_split_weight for k, v in payload.split.items()}
+
+    split_counts = {"train": 0, "valid": 0, "test": 0}
+    
+    total_assets = len(shuffled_assets)
+    train_end = int(total_assets * split_ratios.get("train", 0))
+    valid_end = train_end + int(total_assets * split_ratios.get("valid", 0))
+
+    splits = {}
+    for i, asset in enumerate(shuffled_assets):
+        if i < train_end:
+            split_name = "train"
+        elif i < valid_end:
+            split_name = "valid"
+        else:
+            split_name = "test"
+        splits[asset["id"]] = split_name
+        split_counts[split_name] += 1
+
+    version["split_counts"] = split_counts
+
+    # Create directories
+    version_dir = _project_dir(project_id) / "versions" / version_id
+    for split_name in ["train", "valid", "test"]:
+        (version_dir / split_name / "images").mkdir(parents=True, exist_ok=True)
+        (version_dir / split_name / "labels").mkdir(parents=True, exist_ok=True)
+
+    # Copy files
+    asset_mapping = {}
+    for asset in shuffled_assets:
+        split_name = splits[asset["id"]]
+        dest_images_dir = version_dir / split_name / "images"
+        
+        src_path = get_asset_path(asset)
+        if src_path and src_path.exists():
+            dest_path = dest_images_dir / asset["filename"]
+            shutil.copy2(src_path, dest_path)
+            
+        asset_mapping[asset["id"]] = {
+            "split": split_name,
+            "filename": asset["filename"],
+            "annotations": asset.get("annotations", {})
+        }
+
+    with (version_dir / "version_meta.json").open("w") as f:
+        json.dump(asset_mapping, f, indent=2)
 
     def mut(versions):
         versions.append(version)

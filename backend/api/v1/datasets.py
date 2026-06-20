@@ -87,10 +87,31 @@ def list_versions(project_id: str):
 
 @router.post("/versions", response_model=DatasetVersion, status_code=201)
 def create_version(project_id: str, payload: VersionCreate):
-    version = svc.create_version(project_id, payload)
+    try:
+        version = svc.create_version(project_id, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if version is None:
         raise HTTPException(status_code=404, detail="Project not found")
     return version
+
+@router.get("/versions/{version_id}", response_model=DatasetVersion)
+def get_version(project_id: str, version_id: str):
+    if not svc.project_exists(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    version = svc.get_version(project_id, version_id)
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+    return version
+
+@router.delete("/versions/{version_id}")
+def delete_version(project_id: str, version_id: str):
+    if not svc.project_exists(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    version = svc.delete_version(project_id, version_id)
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+    return {"status": "deleted", "id": version_id}
 
 @router.put("/dataset/assets/{asset_id}/annotations", response_model=DatasetAsset)
 def update_asset_annotations(project_id: str, asset_id: str, payload: AssetAnnotationsUpdate):
