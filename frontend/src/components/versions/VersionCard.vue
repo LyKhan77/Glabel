@@ -31,9 +31,9 @@ const timeAgo = (dateStr) => {
         <span class="time">{{ timeAgo(version.created_at) }}</span>
       </div>
       <div class="actions">
-        <button class="icon-btn" @click.stop="emit('export', version)" title="Export">Export</button>
-        <button class="icon-btn" @click.stop="emit('duplicate', version)" title="Duplicate">Duplicate</button>
-        <button class="icon-btn danger" @click.stop="emit('delete', version)" title="Delete">Delete</button>
+        <button class="icon-btn" @click.stop="emit('export', version)" title="Export">[ Export ]</button>
+        <button class="icon-btn" @click.stop="emit('duplicate', version)" title="Duplicate">[ Dup ]</button>
+        <button class="icon-btn danger" @click.stop="emit('delete', version)" title="Delete">[ X ]</button>
       </div>
     </div>
     
@@ -52,85 +52,85 @@ const timeAgo = (dateStr) => {
 
 <style scoped>
 .version-card {
-  border: 1px solid var(--border-color, #646262);
-  border-radius: 6px;
-  padding: 1rem;
-  background: var(--card-bg, #1a1a1a);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 16px;
+  background: var(--bg-color);
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .version-card:hover {
-  border-color: var(--text-color, #fdfcfc);
-  background: var(--hover-bg, #2a2a2a);
+  border-color: var(--text-color);
+  background: var(--hover-bg);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
 }
 
 .title-group h4 {
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 4px 0;
   font-size: 1.1rem;
+  font-weight: 700;
 }
 
 .time {
-  font-size: 0.8rem;
-  color: var(--mute, #888);
+  font-size: 0.85rem;
+  color: var(--mute);
 }
 
 .actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .icon-btn {
   background: transparent;
-  border: 1px solid #646262;
-  color: inherit;
-  font-size: 0.8rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
+  border: none;
+  color: var(--mute);
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0;
   cursor: pointer;
 }
 
 .icon-btn:hover {
-  background: #333;
-}
-
-.icon-btn.danger {
-  color: #e06c75;
-  border-color: #e06c75;
+  color: var(--text-color);
 }
 
 .icon-btn.danger:hover {
-  background: rgba(224, 108, 117, 0.1);
+  color: var(--danger);
 }
 
 .card-body {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 16px;
 }
 
 .stat {
   font-size: 0.9rem;
+  color: var(--body);
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .chip {
-  font-size: 0.75rem;
-  padding: 0.2rem 0.5rem;
-  border: 1px solid #646262;
-  border-radius: 12px;
-  background: #201d1d;
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--surface-soft);
+  color: var(--body);
 }
 </style>

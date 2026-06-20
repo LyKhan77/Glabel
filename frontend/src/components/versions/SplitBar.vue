@@ -6,9 +6,9 @@
       <div class="split-segment test" :style="{ width: test + '%' }" :title="'Test: ' + test + '%'"></div>
     </div>
     <div v-if="showLegend" class="split-legend">
-      <span class="legend-item"><span class="dot train"></span> Train ({{ train }}%)</span>
-      <span class="legend-item"><span class="dot valid"></span> Valid ({{ valid }}%)</span>
-      <span class="legend-item"><span class="dot test"></span> Test ({{ test }}%)</span>
+      <span class="legend-item"><span class="box train"></span> Train ({{ train }}%)</span>
+      <span class="legend-item"><span class="box valid"></span> Valid ({{ valid }}%)</span>
+      <span class="legend-item"><span class="box test"></span> Test ({{ test }}%)</span>
     </div>
   </div>
 </template>
@@ -34,7 +34,8 @@ defineProps({
   height: 8px;
   border-radius: 4px;
   overflow: hidden;
-  background: var(--bg-surface, #1e1e1e);
+  background: var(--surface-soft);
+  border: 1px solid var(--hairline);
 }
 
 .split-segment {
@@ -42,26 +43,27 @@ defineProps({
   transition: width 0.3s ease;
 }
 
-.train { background-color: var(--success, #10b981); }
-.valid { background-color: var(--primary, #3b82f6); }
-.test { background-color: var(--warning, #f59e0b); }
+.train { background-color: var(--success); }
+.valid { background-color: var(--accent); }
+.test { background-color: var(--warning); }
 
 .split-legend {
   display: flex;
-  gap: 12px;
-  font-size: 11px;
-  color: var(--text-secondary, #a0a0a0);
+  gap: 16px;
+  font-size: 0.85rem;
+  color: var(--mute);
+  font-family: inherit;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
-.dot {
+.box {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: 2px;
 }
 </style>

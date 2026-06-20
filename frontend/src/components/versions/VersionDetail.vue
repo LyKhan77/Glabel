@@ -32,13 +32,23 @@ const exportFormat = ref('yolo')
       
       <div class="panel-content">
         <div class="section">
-          <h4>Details</h4>
-          <p><strong>Created:</strong> {{ new Date(version.created_at).toLocaleString() }}</p>
-          <p><strong>Assets:</strong> {{ version.asset_count }}</p>
+          <h4>[+] Details</h4>
+          <div class="detail-row">
+            <span class="detail-key">Created:</span>
+            <span class="detail-val">{{ new Date(version.created_at).toLocaleString() }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-key">Assets:</span>
+            <span class="detail-val">{{ version.asset_count }}</span>
+          </div>
+          <div class="detail-row" v-if="version.description">
+            <span class="detail-key">Note:</span>
+            <span class="detail-val">{{ version.description }}</span>
+          </div>
         </div>
 
         <div class="section" v-if="version.split">
-          <h4>Split Ratios</h4>
+          <h4>[+] Split Ratios</h4>
           <SplitBar :train="version.split.train" :valid="version.split.valid" :test="version.split.test" />
           <div class="split-stats">
             <span>Train: {{ version.split.train }}%</span>
@@ -48,20 +58,23 @@ const exportFormat = ref('yolo')
         </div>
 
         <div class="section" v-if="version.preprocessing?.length">
-          <h4>Preprocessing</h4>
+          <h4>[+] Preprocessing</h4>
           <ul class="steps-list">
             <li v-for="step in version.preprocessing" :key="step">
-              {{ step }}
+              [-] {{ step }}
             </li>
           </ul>
         </div>
 
         <div class="section" v-if="version.augmentations?.length">
-          <h4>Augmentations</h4>
-          <p v-if="version.multiplier"><strong>Multiplier:</strong> {{ version.multiplier }}x</p>
+          <h4>[+] Augmentations</h4>
+          <div class="detail-row" v-if="version.multiplier">
+            <span class="detail-key">Multiplier:</span>
+            <span class="detail-val">{{ version.multiplier }}x</span>
+          </div>
           <ul class="steps-list">
             <li v-for="aug in version.augmentations" :key="aug">
-              {{ aug }}
+              [-] {{ aug }}
             </li>
           </ul>
         </div>
@@ -69,13 +82,13 @@ const exportFormat = ref('yolo')
 
       <div class="panel-footer">
         <div class="export-group">
-          <select v-model="exportFormat" class="format-select">
+          <select v-model="exportFormat" class="text-input">
             <option value="yolo">YOLO</option>
             <option value="coco">COCO</option>
           </select>
-          <button class="action-btn" @click="emit('export', { version, format: exportFormat })">Export</button>
+          <button class="btn-primary" @click="emit('export', { version, format: exportFormat })">Export</button>
         </div>
-        <button class="action-btn danger-btn" @click="emit('delete', version)">Delete</button>
+        <button class="btn-secondary danger-btn" @click="emit('delete', version)">Delete</button>
       </div>
     </div>
   </div>
@@ -88,8 +101,8 @@ const exportFormat = ref('yolo')
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: var(--z-modal);
   display: flex;
   justify-content: flex-end;
 }
@@ -98,11 +111,11 @@ const exportFormat = ref('yolo')
   width: 400px;
   max-width: 100%;
   height: 100%;
-  background: var(--bg-color, #121212);
-  border-left: 1px solid var(--border-color, #646262);
+  background: var(--bg-color);
+  border-left: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  animation: slideIn 0.3s ease-out;
+  animation: slideIn 0.2s ease-out;
 }
 
 @keyframes slideIn {
@@ -114,48 +127,67 @@ const exportFormat = ref('yolo')
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid #646262;
+  padding: 24px;
+  border-bottom: 1px solid var(--hairline);
 }
 
 .panel-header h3 {
   margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
 }
 
 .close-btn {
   background: transparent;
   border: none;
-  color: inherit;
-  font-size: 1.2rem;
+  color: var(--mute);
+  font-family: inherit;
+  font-size: 1rem;
   cursor: pointer;
+  padding: 0;
+}
+
+.close-btn:hover {
+  color: var(--text-color);
 }
 
 .panel-content {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 32px;
 }
 
 .section h4 {
-  margin: 0 0 1rem 0;
-  color: var(--text-color, #fdfcfc);
-  border-bottom: 1px dashed #333;
-  padding-bottom: 0.5rem;
+  margin: 0 0 16px 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-color);
 }
 
-.section p {
-  margin: 0.5rem 0;
+.detail-row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.detail-key {
+  color: var(--mute);
+}
+
+.detail-val {
+  color: var(--body);
 }
 
 .split-stats {
   display: flex;
   justify-content: space-between;
   font-size: 0.85rem;
-  color: var(--mute, #888);
-  margin-top: 0.5rem;
+  color: var(--mute);
+  margin-top: 12px;
 }
 
 .steps-list {
@@ -164,19 +196,14 @@ const exportFormat = ref('yolo')
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-}
-
-.steps-list li {
-  background: #201d1d;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  border: 1px solid #333;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--body);
 }
 
 .panel-footer {
-  padding: 1.5rem;
-  border-top: 1px solid #646262;
+  padding: 24px;
+  border-top: 1px solid var(--hairline);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -184,36 +211,61 @@ const exportFormat = ref('yolo')
 
 .export-group {
   display: flex;
-  gap: 0.5rem;
+  gap: 12px;
 }
 
-.format-select {
-  background: transparent;
-  color: inherit;
-  border: 1px solid #646262;
-  padding: 0.5rem;
+.text-input {
+  background: var(--surface-soft);
+  color: var(--text-color);
+  border: 1px solid var(--hairline);
   border-radius: 4px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 0.9rem;
 }
 
-.action-btn {
-  background: transparent;
-  border: 1px solid #646262;
-  color: inherit;
-  padding: 0.5rem 1rem;
+.text-input:focus {
+  background: var(--bg-color);
+  border-color: var(--text-color);
+  outline: none;
+}
+
+.btn-primary {
+  background: var(--text-color);
+  color: var(--bg-color);
+  border: none;
   border-radius: 4px;
+  padding: 8px 20px;
+  font-family: inherit;
+  font-weight: 500;
   cursor: pointer;
 }
 
-.action-btn:hover {
-  background: #333;
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px 20px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: var(--hover-bg);
 }
 
 .danger-btn {
-  color: #e06c75;
-  border-color: #e06c75;
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 .danger-btn:hover {
-  background: rgba(224, 108, 117, 0.1);
+  background: rgba(255, 59, 48, 0.1);
 }
 </style>

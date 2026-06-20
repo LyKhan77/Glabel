@@ -1,50 +1,48 @@
 <template>
-  <div v-if="visible" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-    <div class="bg-white rounded-xl shadow-2xl w-[900px] max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden">
-      <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
-        <h3 class="text-lg font-semibold">Preview: {{ augmentationKey }}</h3>
-        <button @click="$emit('close')" class="text-gray-500 hover:text-gray-700">
-          <XIcon class="w-5 h-5" />
-        </button>
+  <div v-if="visible" class="modal-backdrop" @click="$emit('close')">
+    <div class="modal-content" @click.stop>
+      <div class="modal-header">
+        <h3 class="modal-title">Preview: {{ augmentationKey }}</h3>
+        <button @click="$emit('close')" class="close-btn">[x]</button>
       </div>
       
-      <div class="p-6 flex-1 overflow-y-auto flex flex-col gap-6">
-        <div class="grid grid-cols-2 gap-4">
+      <div class="modal-body">
+        <div class="preview-grid">
           <!-- Original -->
-          <div class="flex flex-col gap-2">
-            <span class="text-sm font-medium text-gray-700">Original</span>
-            <div class="bg-gray-100 rounded-lg aspect-video flex items-center justify-center overflow-hidden border">
-              <img v-if="originalUrl" :src="originalUrl" class="w-full h-full object-contain" />
-              <div v-else class="text-gray-400">Loading...</div>
+          <div class="preview-col">
+            <span class="preview-label">Original</span>
+            <div class="image-container">
+              <img v-if="originalUrl" :src="originalUrl" class="preview-img" />
+              <div v-else class="loading-state">Loading...</div>
             </div>
           </div>
           <!-- Preview -->
-          <div class="flex flex-col gap-2">
-            <span class="text-sm font-medium text-gray-700">Preview</span>
-            <div class="bg-gray-100 rounded-lg aspect-video flex items-center justify-center overflow-hidden border relative">
-              <img v-if="previewUrl" :src="previewUrl" class="w-full h-full object-contain" />
-              <div v-if="loadingPreview" class="absolute inset-0 bg-white/50 flex items-center justify-center">
-                <span class="text-gray-800 font-medium bg-white px-3 py-1 rounded shadow">Loading...</span>
+          <div class="preview-col">
+            <span class="preview-label">Preview</span>
+            <div class="image-container">
+              <img v-if="previewUrl" :src="previewUrl" class="preview-img" />
+              <div v-if="loadingPreview" class="loading-overlay">
+                <span class="loading-badge">Loading...</span>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Controls -->
-        <div class="bg-gray-50 p-4 rounded-lg border">
-          <div class="flex justify-between items-center mb-4">
-            <h4 class="font-medium">Parameters</h4>
-            <button @click="fetchPreview" class="text-sm px-3 py-1 bg-white border rounded hover:bg-gray-50">
-              Regenerate (Random Preview)
+        <div class="controls-section">
+          <div class="controls-header">
+            <h4>Parameters</h4>
+            <button @click="fetchPreview" class="btn-secondary small">
+              [ Regenerate ]
             </button>
           </div>
           
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div v-for="(val, key) in localParams" :key="key" class="flex flex-col gap-1">
-              <label class="text-sm text-gray-600 capitalize flex justify-between">
-                <span>{{ key.replace('_', ' ') }}</span>
-                <span class="font-mono">{{ localParams[key] }}</span>
-              </label>
+          <div class="params-grid">
+            <div v-for="(val, key) in localParams" :key="key" class="param-row">
+              <div class="param-labels">
+                <label>{{ key.replace('_', ' ') }}</label>
+                <span class="param-val">{{ localParams[key] }}</span>
+              </div>
               <input 
                 type="range" 
                 v-model.number="localParams[key]" 
@@ -52,28 +50,23 @@
                 :max="getMax(key)" 
                 :step="getStep(key)"
                 @input="onParamChange"
-                class="w-full"
+                class="range-slider"
               />
             </div>
           </div>
         </div>
       </div>
       
-      <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
-        <button @click="$emit('close')" class="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-gray-100">
-          Cancel
-        </button>
-        <button @click="apply" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-          Apply
-        </button>
+      <div class="modal-footer">
+        <button @click="$emit('close')" class="btn-secondary">Cancel</button>
+        <button @click="apply" class="btn-primary">Apply</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { X as XIcon } from 'lucide-vue-next'
+import { ref, watch, onUnmounted } from 'vue'
 import { previewAugmentation, listDatasetAssets, API_BASE_URL } from '../../api/client.js'
 
 const props = defineProps({
@@ -165,3 +158,238 @@ onUnmounted(() => {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
 })
 </script>
+
+<style scoped>
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.modal-content {
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  width: 900px;
+  max-width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: none; /* explicitly removing shadows */
+}
+
+.modal-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--surface-soft);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: var(--mute);
+  font-family: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.close-btn:hover {
+  color: var(--text-color);
+}
+
+.modal-body {
+  padding: 24px;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.preview-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--body);
+}
+
+.image-container {
+  background: var(--surface-soft);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.loading-state {
+  color: var(--mute);
+  font-size: 0.9rem;
+}
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(253, 252, 252, 0.5); /* matches canvas cream mostly */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-theme='dark'] .loading-overlay {
+  background: rgba(26, 26, 26, 0.5);
+}
+
+.loading-badge {
+  background: var(--bg-color);
+  color: var(--text-color);
+  padding: 4px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.controls-section {
+  background: var(--surface-soft);
+  padding: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--hairline);
+}
+
+.controls-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.controls-header h4 {
+  margin: 0;
+  font-weight: 500;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px 20px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-secondary.small {
+  padding: 4px 12px;
+  font-size: 0.85rem;
+}
+
+.btn-secondary:hover {
+  background: var(--hover-bg);
+}
+
+.btn-primary {
+  background: var(--text-color);
+  color: var(--bg-color);
+  border: none;
+  border-radius: 4px;
+  padding: 8px 20px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.params-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.param-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.param-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--body);
+  text-transform: capitalize;
+}
+
+.param-val {
+  font-family: inherit;
+}
+
+.range-slider {
+  width: 100%;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.range-slider::-webkit-slider-runnable-track {
+  background: var(--hairline);
+  height: 4px;
+  border-radius: 2px;
+}
+
+.range-slider::-webkit-slider-thumb {
+  appearance: none;
+  margin-top: -6px;
+  background: var(--text-color);
+  height: 16px;
+  width: 8px;
+  border-radius: 2px;
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-soft);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+</style>
