@@ -141,3 +141,13 @@ export async function previewAugmentation(projectId, key, params, assetId = null
   if (!response.ok) throw new Error('Failed to preview augmentation');
   return response.blob();
 }
+
+export function listModels() {
+  return request('/api/v1/models')
+}
+
+export function downloadModel(modelId) {
+  return request(`/api/v1/models/${modelId}/download`, {
+    method: 'POST'
+  })
+}

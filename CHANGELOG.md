@@ -64,6 +64,44 @@ Use this structure for every new AI-agent change entry:
 
 ## AI-Agent Change Entries
 
+### 2026-06-21 - Models Manager Implementation
+
+**Agent scope**
+
+- Request: Add a "List Model" section in Settings to download Ultralytics-compatible models (YOLO, RT-DETR, SAM) locally.
+- Intent: Lay the groundwork for Auto-Annotation and Training features by providing local model weights.
+- Status: Completed.
+
+**Changed files**
+
+- `backend/schemas/models.py`: Created Pydantic schema for `ModelItem`.
+- `backend/services/models.py`: Built dynamic registry for ~60 model variants (YOLOv11, YOLO26, RT-DETR, SAM2, SAM3) and implemented synchronous `.pt` downloading via `httpx`.
+- `backend/api/v1/models.py`: Added GET and POST endpoints for listing and downloading models.
+- `backend/main.py`: Mounted the `models` router.
+- `frontend/src/api/client.js`: Added API bindings.
+- `frontend/src/views/SettingsView.vue`: Built "Model Repository" UI block adhering to the `DESIGN.md` minimalist aesthetic.
+- `backend/tests/test_models_api.py`: Wrote unit tests for models registry and endpoints.
+
+**Behavior before**
+
+- SettingsView only contained mock hardware detection and a simple data directory input. No models system existed.
+
+**What changed**
+
+- Fully implemented a local model repository system capable of streaming large weights directly from GitHub releases to `glabel_data/models/`.
+
+**After the change**
+
+- Users can browse available object detection, segmentation, pose, classification, and label assist models, check their download status, and download them to the local workspace with one click.
+
+**Verification**
+
+- Run backend tests: `.\.venv\Scripts\python.exe -m pytest backend/tests/test_models_api.py -v` (Passed).
+
+**Follow-up notes**
+
+- Downloads are synchronous right now (HTTP blocks). If download times out, consider backgrounding it or implementing WebSockets/SSE for progress streaming.
+
 ### 2026-06-21 - Dataset Versions UI Redesign (Impeccable)
 
 **Agent scope**
@@ -269,6 +307,7 @@ This table is the high-level capability map. Keep it concise but current. Detail
 
 | Area | Timeline (git) | What was developed | After the change |
 | ------ | ---------------- | -------------------- | ------------------ |
+| Models Manager | 2026-06-21 | Local repository for downloading YOLO, RT-DETR, and SAM weights. | Users can download ~60 model variants directly via Settings UI. |
 | Dataset Versions | 2026-06-21 | 4-step Version Wizard, live augmentation preview via OpenCV, VersionCard dashboard, Slide-over detail, YOLO/COCO export API. | Robust version management, split configuration, and ZIP export. |
 | Dataset Browsing UX | 2026-06-21 | Client-side 50-image pagination, page-scoped selection, compact annotation queue rows. | Larger datasets are easier to browse and long filenames no longer dominate the annotation queue. |
 | Annotation UI/UX Enhancements | 2026-06-20 | Polygon edge insertion, skeleton movement, shortcuts modal, class recoloring. | Robust and precise annotation toolkit with better accessibility. |
