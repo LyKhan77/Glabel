@@ -104,6 +104,7 @@ const filteredAssets = computed(() => {
   return currentAssets.value.filter((asset) => asset.filename.toLowerCase().includes(query))
 })
 const selectedIndex = computed(() => currentAssets.value.findIndex((asset) => asset.id === selectedImage.value?.id))
+const selectedQueuePosition = computed(() => selectedIndex.value === -1 ? 0 : selectedIndex.value + 1)
 const selectedAnnotations = computed(() => normalizeAnnotations(taskType.value, selectedImage.value?.annotations))
 const canUndo = computed(() => history.value.length > 0)
 const canRedo = computed(() => redoStack.value.length > 0)
@@ -978,7 +979,7 @@ function generateClassColor(index) {
           <ChevronLeft :size="16" />
           Back
         </button>
-        <span class="task-pill">{{ taskLabel }}</span>
+        <span class="task-pill">{{ selectedQueuePosition }} / {{ currentAssets.length }} · {{ taskLabel }}</span>
       </div>
 
       <div class="queue-tabs" role="tablist" aria-label="Asset status">
@@ -1005,7 +1006,7 @@ function generateClassColor(index) {
           @keyup.enter="selectAsset(asset)"
         >
           <img :src="getImageUrl(asset)" class="queue-thumb" loading="lazy" draggable="false" alt="" />
-          <span class="asset-name">{{ asset.filename }}</span>
+          <span class="asset-name" :title="asset.filename">{{ asset.filename }}</span>
           <span class="asset-row-footer">
             <span class="asset-status">{{ asset.status }}</span>
             <button class="row-delete" type="button" title="Delete image" @click="deleteAsset($event, asset)">
@@ -1582,6 +1583,12 @@ button:disabled {
   padding: 0.55rem;
 }
 
+.asset-list {
+  min-height: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
 .asset-row,
 .class-row,
 .annotation-row {
@@ -1597,16 +1604,16 @@ button:disabled {
 }
 
 .asset-row {
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .asset-row-footer {
-  width: 100%;
+  width: auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.5rem;
+  margin-left: auto;
 }
 
 .asset-row.selected,
@@ -1617,8 +1624,11 @@ button:disabled {
 }
 
 .asset-name {
-  max-width: 100%;
-  overflow-wrap: anywhere;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .row-delete {

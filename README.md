@@ -47,7 +47,8 @@ The project intentionally avoids heavy infrastructure: no SQL database, no Docke
 - Frontend/backend integration for project list, create, and detail flows.
 - Backend dataset upload API with image/video ingestion and OpenCV frame extraction.
 - Backend dataset auto-annotation state transition and dataset version metadata.
-- Dataset annotation studio with task-aware classification, bounding box, polygon, and COCO pose tools.
+- Dataset page with 50-image pagination for Unassigned/Annotating panes and page-scoped selection.
+- Dataset annotation studio with task-aware classification, bounding box, polygon, COCO pose tools, compact image queue, and long-filename handling.
 - Per-project local data directory (`GLABEL_DATA_DIR`), gitignored.
 
 **Planned (roadmap):**
@@ -158,7 +159,7 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 
 ## Current State & Changelog  ·  `[KEEP UPDATED]`
 
-**Status:** Frontend and backend are integrated for project CRUD, dataset upload, video frame extraction, annotation state, dataset version metadata, and interactive canvas annotation tools (Classes, BBox, Polygon, Pose Skeleton). Real model training remains intentionally out of scope for this branch.
+**Status:** Frontend and backend are integrated for project CRUD, dataset upload, video frame extraction, paginated dataset browsing, annotation state, dataset version metadata, and interactive canvas annotation tools (Classes, BBox, Polygon, Pose Skeleton). Real model training remains intentionally out of scope for this branch.
 
 **Active branch:** `feat/enhance-openvision`.
 
@@ -175,6 +176,7 @@ Interactive docs: `http://127.0.0.1:8000/docs` (Swagger UI, FastAPI default).
 | **2026-06-19** | Dataset Unassigned Actions | Asset unassigned harus dipilih satu-satu dan tidak bisa dihapus | Tambah Select all dan Delete untuk asset unassigned; backend menghapus record dan file asset yang masih unassigned. |
 | **2026-06-19** | Dataset Annotating Actions | Asset annotating tidak bisa dipilih untuk dikembalikan | Tambah select di pane Annotating, Return to Unassigned, dan cursor guide horizontal/vertical di canvas anotasi. |
 | **2026-06-20** | Annotation UX Polish | Anotasi perlu tombol Save dan delete ada di toolbar | Anotasi autosave, delete annotation pindah ke list Annotations, dan image di queue annotation bisa dihapus langsung. |
+| **2026-06-21** | Dataset Browsing UX | Dataset panes merender semua asset dan queue annotation boros ruang untuk filename panjang | Tambah pagination 50 image/page, Select page, filename clamp/ellipsis, dan queue annotation compact. |
 
 **In development / next:**
 - WebSocket layer (training progress, playground inference).

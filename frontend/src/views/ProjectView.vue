@@ -14,6 +14,9 @@ import {
   uploadDatasetFiles
 } from '../api/client'
 import AnnotationWorkspace from '../components/AnnotationWorkspace.vue'
+import { paginateItems } from '../utils/pagination.js'
+
+const DATASET_PAGE_SIZE = 50
 
 const router = useRouter()
 const route = useRoute()
@@ -34,6 +37,8 @@ const fileInput = ref(null)
 
 const selectedUnassigned = ref([])
 const selectedAnnotating = ref([])
+const unassignedPage = ref(1)
+const annotatingPage = ref(1)
 
 const onDragOver = (e) => { e.preventDefault(); isDragging.value = true }
 const onDragLeave = (e) => { e.preventDefault(); isDragging.value = false }
@@ -45,7 +50,12 @@ const onDrop = (e) => {
 
 const unassignedImages = computed(() => assets.value.filter(asset => asset.status === 'unassigned' && asset.kind !== 'video'))
 const annotatingImages = computed(() => assets.value.filter(asset => (asset.status === 'unannotated' || asset.status === 'annotated') && asset.kind !== 'video'))
-const allUnassignedSelected = computed(() => unassignedImages.value.length > 0 && selectedUnassigned.value.length === unassignedImages.value.length)
+const unassignedPagination = computed(() => paginateItems(unassignedImages.value, unassignedPage.value, DATASET_PAGE_SIZE))
+const annotatingPagination = computed(() => paginateItems(annotatingImages.value, annotatingPage.value, DATASET_PAGE_SIZE))
+const paginatedUnassignedImages = computed(() => unassignedPagination.value.items)
+const paginatedAnnotatingImages = computed(() => annotatingPagination.value.items)
+const unassignedPageIds = computed(() => paginatedUnassignedImages.value.map(asset => asset.id))
+const allUnassignedSelected = computed(() => unassignedPageIds.value.length > 0 && unassignedPageIds.value.every(id => selectedUnassigned.value.includes(id)))
 
 const toggleSelection = (id) => {
   const index = selectedUnassigned.value.indexOf(id)
@@ -72,13 +82,19 @@ const assignSelected = async () => {
     await assignDatasetAssets(projectId.value, selectedUnassigned.value)
     assets.value = await listDatasetAssets(projectId.value)
     selectedUnassigned.value = []
+    unassignedPage.value = 1
+    annotatingPage.value = 1
   } catch (error) {
     errorMessage.value = 'Failed to assign selected assets.'
   }
 }
 
 const toggleSelectAllUnassigned = () => {
-  selectedUnassigned.value = allUnassignedSelected.value ? [] : unassignedImages.value.map(asset => asset.id)
+  if (allUnassignedSelected.value) {
+    selectedUnassigned.value = selectedUnassigned.value.filter(id => !unassignedPageIds.value.includes(id))
+  } else {
+    selectedUnassigned.value = Array.from(new Set([...selectedUnassigned.value, ...unassignedPageIds.value]))
+  }
 }
 
 const deleteSelectedUnassigned = async () => {
@@ -89,6 +105,7 @@ const deleteSelectedUnassigned = async () => {
     await deleteDatasetAssets(projectId.value, selectedUnassigned.value)
     assets.value = await listDatasetAssets(projectId.value)
     selectedUnassigned.value = []
+    unassignedPage.value = 1
   } catch (error) {
     errorMessage.value = 'Failed to delete selected assets.'
   }
@@ -101,6 +118,8 @@ const returnSelectedToUnassigned = async () => {
     await unassignDatasetAssets(projectId.value, selectedAnnotating.value)
     assets.value = await listDatasetAssets(projectId.value)
     selectedAnnotating.value = []
+    unassignedPage.value = 1
+    annotatingPage.value = 1
   } catch (error) {
     errorMessage.value = 'Failed to return selected assets.'
   }
@@ -112,6 +131,8 @@ const openAnnotationWorkspace = () => {
 
 const refreshDatasetAssets = async () => {
   assets.value = await listDatasetAssets(projectId.value)
+  unassignedPage.value = 1
+  annotatingPage.value = 1
 }
 
 const goBack = () => {
@@ -134,6 +155,8 @@ const loadProject = async () => {
     project.value = projectData
     assets.value = assetData
     versions.value = versionData
+    unassignedPage.value = 1
+    annotatingPage.value = 1
   } catch (error) {
     errorMessage.value = 'Could not load project data. Check backend status.'
   } finally {
@@ -146,6 +169,8 @@ const autoAnnotateAll = async () => {
   try {
     await autoAnnotateDataset(projectId.value)
     assets.value = await listDatasetAssets(projectId.value)
+    unassignedPage.value = 1
+    annotatingPage.value = 1
   } catch (error) {
     errorMessage.value = 'Auto-annotate failed. Check backend status.'
   }
@@ -166,6 +191,8 @@ const uploadFiles = async (files) => {
   try {
     await uploadDatasetFiles(projectId.value, files, fpsSlider.value)
     assets.value = await listDatasetAssets(projectId.value)
+    unassignedPage.value = 1
+    annotatingPage.value = 1
   } catch (error) {
     errorMessage.value = 'Upload failed. Check file type and backend status.'
   }
@@ -284,7 +311,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEsc))
               <h3>Unassigned ({{ unassignedImages.length }})</h3>
               <div class="pane-actions">
                 <button class="action-btn" @click="toggleSelectAllUnassigned" :disabled="!unassignedImages.length">
-                  {{ allUnassignedSelected ? 'Clear' : 'Select all' }}
+                  {{ allUnassignedSelected ? 'Clear page' : 'Select page' }}
                 </button>
                 <button class="action-btn danger-btn" @click="deleteSelectedUnassigned" :disabled="!selectedUnassigned.length">Delete</button>
                 <button class="action-btn" @click="assignSelected" :disabled="!selectedUnassigned.length">Assign -></button>
@@ -293,7 +320,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEsc))
             <div class="image-grid">
               <div
                 class="image-card"
-                v-for="img in unassignedImages"
+                v-for="img in paginatedUnassignedImages"
                 :key="img.id"
                 :class="{ selected: selectedUnassigned.includes(img.id) }"
                 role="button"
@@ -303,11 +330,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEsc))
                 @keyup.enter="toggleSelection(img.id)"
               >
                 <img :src="`${API_BASE_URL}/api/v1/projects/${projectId}/dataset/assets/${img.id}/image`" class="served-image" @error="$event.target.style.display='none'" />
-                <div class="image-label">{{ img.filename }}</div>
+                <div class="image-label" :title="img.filename">{{ img.filename }}</div>
                 <div v-if="selectedUnassigned.includes(img.id)" class="select-tick" aria-hidden="true">✓</div>
               </div>
               <div v-if="unassignedImages.length === 0" class="empty-state">
                 No unassigned images.
+              </div>
+            </div>
+            <div v-if="unassignedImages.length > DATASET_PAGE_SIZE" class="pagination-bar">
+              <span>Showing {{ unassignedPagination.start }}-{{ unassignedPagination.end }} of {{ unassignedPagination.total }}</span>
+              <div class="pagination-actions">
+                <button class="action-btn" @click="unassignedPage = unassignedPagination.page - 1" :disabled="unassignedPagination.page === 1">Prev</button>
+                <span>Page {{ unassignedPagination.page }} / {{ unassignedPagination.pageCount }}</span>
+                <button class="action-btn" @click="unassignedPage = unassignedPagination.page + 1" :disabled="unassignedPagination.page === unassignedPagination.pageCount">Next</button>
               </div>
             </div>
           </div>
@@ -322,7 +357,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEsc))
             <div class="image-grid">
               <div
                 class="image-card"
-                v-for="img in annotatingImages"
+                v-for="img in paginatedAnnotatingImages"
                 :key="img.id"
                 :class="{ selected: selectedAnnotating.includes(img.id) }"
                 role="button"
@@ -332,12 +367,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEsc))
                 @keyup.enter="toggleAnnotatingSelection(img.id)"
               >
                 <img :src="`${API_BASE_URL}/api/v1/projects/${projectId}/dataset/assets/${img.id}/image`" class="served-image" @error="$event.target.style.display='none'" />
-                <div class="image-label">{{ img.filename }}</div>
+                <div class="image-label" :title="img.filename">{{ img.filename }}</div>
                 <div class="status-badge" v-if="img.status === 'annotated'">Annotated</div>
                 <div v-if="selectedAnnotating.includes(img.id)" class="select-tick" aria-hidden="true">✓</div>
               </div>
               <div v-if="annotatingImages.length === 0" class="empty-state">
                 No images being annotated.
+              </div>
+            </div>
+            <div v-if="annotatingImages.length > DATASET_PAGE_SIZE" class="pagination-bar">
+              <span>Showing {{ annotatingPagination.start }}-{{ annotatingPagination.end }} of {{ annotatingPagination.total }}</span>
+              <div class="pagination-actions">
+                <button class="action-btn" @click="annotatingPage = annotatingPagination.page - 1" :disabled="annotatingPagination.page === 1">Prev</button>
+                <span>Page {{ annotatingPagination.page }} / {{ annotatingPagination.pageCount }}</span>
+                <button class="action-btn" @click="annotatingPage = annotatingPagination.page + 1" :disabled="annotatingPagination.page === annotatingPagination.pageCount">Next</button>
               </div>
             </div>
           </div>
@@ -406,7 +449,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEsc))
         <div v-if="trainingProgress > 0" class="progress-container">
           <p>Training Progress: {{ trainingProgress }}%</p>
           <div class="progress-bar">
-            <div class="progress-fill" :style="{ width: trainingProgress + '%' }"></div>
+            <div class="progress-fill" :style="{ transform: `scaleX(${trainingProgress / 100})` }"></div>
           </div>
         </div>
         
@@ -615,8 +658,30 @@ button {
 
 .image-label {
   font-size: 0.8rem;
-  word-break: break-all;
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: #646262;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border-color, #646262);
+  color: #646262;
+  font-size: 0.82rem;
+}
+
+.pagination-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .status-badge {
@@ -753,9 +818,12 @@ button:disabled {
 }
 
 .progress-fill {
+  width: 100%;
   height: 100%;
   background: var(--text-color, #201d1d);
-  transition: width 0.3s;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s;
 }
 
 .modal-overlay {
@@ -842,6 +910,12 @@ button:disabled {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+  }
+
+  .split-view,
+  .pagination-bar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

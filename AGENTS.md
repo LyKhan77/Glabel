@@ -128,7 +128,7 @@ Full local app: install dependencies manually first, then `.\scripts\start-dev.p
 > **CRITICAL INSTRUCTION FOR AI AGENTS:**
 > All significant changes, feature additions, and updates MUST be documented in `CHANGELOG.md` which serves as the long-term cross-agent memory. Do not add new changelog entries directly here. Instead, you must explicitly update `CHANGELOG.md` and keep this section solely as a summary and pointer.
 
-**Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, dataset version metadata, and a task-aware annotation studio for classification, object detection, segmentation, and COCO pose. Active branch `feat/enhance-openvision`.
+**Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, paginated dataset browsing, dataset version metadata, and a task-aware annotation studio for classification, object detection, segmentation, and COCO pose. Active branch `feat/enhance-openvision`.
 
 **Detailed Log:** See `CHANGELOG.md` for a complete history of AI agent changes and updates.
 

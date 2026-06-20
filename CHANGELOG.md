@@ -64,6 +64,50 @@ Use this structure for every new AI-agent change entry:
 
 ## AI-Agent Change Entries
 
+### 2026-06-21 - Dataset Browsing UX Pagination
+
+**Agent scope**
+
+- Request: Implement the planned Dataset page and Annotation queue UX improvements.
+- Intent: Make large image sets easier to browse without adding backend pagination prematurely.
+- Status: Completed.
+
+**Changed files**
+
+- `frontend/src/views/ProjectView.vue`: Added client-side 50-image pagination for Unassigned and Annotating panes, page-scoped selection, page status text, and clamped filename labels.
+- `frontend/src/components/AnnotationWorkspace.vue`: Made the left asset queue denser with horizontal rows, filename ellipsis, full filename titles, queue scrolling, and selected-position progress.
+- `frontend/src/utils/pagination.js`: Added a small pagination helper.
+- `frontend/tests/pagination.test.mjs`: Added pagination helper coverage.
+- `README.md`, `AGENTS.md`, `CHANGELOG.md`: Updated current feature documentation.
+
+**Behavior before**
+
+- Dataset panes rendered every image at once, Select all targeted the full unassigned set, and long filenames wrapped aggressively in grid cards.
+- The Annotation left queue used tall vertical rows, so long filenames made large queues hard to scan.
+
+**What changed**
+
+- Dataset Unassigned and Annotating panes now show 50 images per page with Prev/Next controls and showing-count text.
+- Unassigned bulk selection is now page-scoped and labeled Select page / Clear page.
+- Dataset card filenames are clamped visually while preserving the full filename via the native title attribute.
+- Annotation queue rows are compact horizontal rows with thumbnail, ellipsized filename, status, and delete action.
+- Annotation queue header shows current position against the active queue count.
+
+**After the change**
+
+- Users can browse larger datasets without long full-page grids, and annotation image selection stays scannable even with many long filenames.
+
+**Verification**
+
+- `npm test -- pagination.test.mjs`
+- `npm test`
+- `npm run build`
+- `node C:/Users/Lee/.codex/skills/impeccable/scripts/detect.mjs --json frontend/src/views/ProjectView.vue frontend/src/components/AnnotationWorkspace.vue`
+
+**Follow-up notes**
+
+- Backend pagination and virtualized lists are intentionally deferred until asset counts or load time prove they are needed.
+
 ### 2026-06-20 - Annotation UI/UX Enhancements
 
 **Agent scope**
@@ -145,6 +189,7 @@ This table is the high-level capability map. Keep it concise but current. Detail
 
 | Area | Timeline (git) | What was developed | After the change |
 | ------ | ---------------- | -------------------- | ------------------ |
+| Dataset Browsing UX | 2026-06-21 | Client-side 50-image pagination, page-scoped selection, compact annotation queue rows. | Larger datasets are easier to browse and long filenames no longer dominate the annotation queue. |
 | Annotation UI/UX Enhancements | 2026-06-20 | Polygon edge insertion, skeleton movement, shortcuts modal, class recoloring. | Robust and precise annotation toolkit with better accessibility. |
 | Annotation UX Polish | 2026-06-20 | Autosave, cursor guides, delete row adjustments. | Enhanced efficiency and precision during labeling tasks. |
 | Dataset Actions | 2026-06-19 | Select all and Delete for unassigned assets; select and return for annotating assets. | Improved bulk management of dataset assets and queue routing. |
