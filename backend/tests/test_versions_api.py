@@ -16,8 +16,10 @@ def client(monkeypatch, tmp_path):
 def project_id(client):
     response = client.post("/api/v1/projects/", json={
         "name": "Dataset Project",
-        "classes": [{"id": "cls_person", "name": "person", "color": "#000000"}]
+        "classes": [{"id": "cls_1", "name": "person", "color": "#000000"}]
     })
+    if response.status_code != 201:
+        print("ERROR", response.json())
     assert response.status_code == 201
     return response.json()["id"]
 
