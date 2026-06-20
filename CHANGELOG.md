@@ -64,6 +64,45 @@ Use this structure for every new AI-agent change entry:
 
 ## AI-Agent Change Entries
 
+### 2026-06-21 - Dataset Versions UI Redesign (Impeccable)
+
+**Agent scope**
+
+- Request: Redesign the Dataset Versions UI to match the project's austere, terminal-native aesthetic.
+- Intent: Eliminate generic SaaS "AI slop" styles (Tailwind utilities, drop shadows, rounded corners) and enforce the `DESIGN.md` guidelines.
+- Status: Completed.
+
+**Changed files**
+
+- `frontend/src/components/versions/VersionWizard.vue`: Removed Tailwind classes, implemented flat CSS, changed steps to ASCII brackets `[x]`.
+- `frontend/src/components/versions/VersionCard.vue`: Removed card shadows, implemented `1px` hairlines, updated hover states.
+- `frontend/src/components/versions/VersionDetail.vue`: Flattened slide-over panel, added `[+]` toggle aesthetics.
+- `frontend/src/components/versions/SplitBar.vue`: Reduced corner radius, replaced dots with square boxes.
+- `frontend/src/components/versions/AugmentationPreview.vue`: Removed heavy modal shadows, restyled range sliders.
+
+**Behavior before**
+
+- The UI used non-existent Tailwind classes like `bg-white`, `text-blue-600`, `rounded-xl`, and `shadow-2xl`. It looked like a generic modern web app instead of Glabel's terminal-inspired canvas.
+
+**What changed**
+
+- Converted all 5 components to strictly use `App.vue` CSS variables (`--bg-color`, `--hairline`, `--surface-soft`, `--text-color`).
+- Removed all drop shadows and forced `border-radius: 4px` (or `0px` for containers).
+- Replaced graphical icons with ASCII indicators (e.g. `[ Export ]`, `[x]`).
+
+**After the change**
+
+- The Dataset Versions feature visually integrates perfectly with the rest of Glabel, feeling crisp, austere, and developer-focused.
+
+**Verification**
+
+- Visually verified via component rewrite.
+- `git commit -am "style(versions): redesign dataset versions UI to match manpage aesthetic"`
+
+**Follow-up notes**
+
+- Future components must strictly adhere to `DESIGN.md` rather than falling back to generic Tailwind/Material styling.
+
 ### 2026-06-21 - Dataset Versions Overhaul
 
 **Agent scope**
