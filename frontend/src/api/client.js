@@ -105,3 +105,39 @@ export function saveAssetAnnotations(projectId, assetId, annotations, status) {
     body: JSON.stringify({ annotations, status })
   })
 }
+
+export async function getDatasetVersion(projectId, versionId) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/versions/${versionId}`);
+  if (!response.ok) throw new Error('Failed to fetch dataset version');
+  return response.json();
+}
+
+export async function deleteDatasetVersion(projectId, versionId) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/versions/${versionId}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) throw new Error('Failed to delete dataset version');
+  return response.json();
+}
+
+export async function exportDatasetVersion(projectId, versionId, format) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/versions/${versionId}/export?format=${format}`, {
+    method: 'POST'
+  });
+  if (!response.ok) throw new Error('Failed to export dataset version');
+  // Return blob
+  return response.blob();
+}
+
+export async function previewAugmentation(projectId, key, params, assetId = null) {
+  const payload = { augmentation_key: key, params };
+  if (assetId) payload.asset_id = assetId;
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/dataset/preview-augmentation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error('Failed to preview augmentation');
+  return response.blob();
+}
