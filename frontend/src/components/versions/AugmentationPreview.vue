@@ -74,7 +74,7 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { X as XIcon } from 'lucide-vue-next'
-import { previewAugmentation, listDatasetAssets, API_BASE_URL } from '@/api/client.js'
+import { previewAugmentation, listDatasetAssets, API_BASE_URL } from '../../api/client.js'
 
 const props = defineProps({
   projectId: String,

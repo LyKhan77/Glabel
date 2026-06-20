@@ -11,9 +11,15 @@ import {
   listDatasetAssets,
   listDatasetVersions,
   unassignDatasetAssets,
-  uploadDatasetFiles
+  uploadDatasetFiles,
+  deleteDatasetVersion,
+  exportDatasetVersion
 } from '../api/client'
 import AnnotationWorkspace from '../components/AnnotationWorkspace.vue'
+import VersionWizard from '../components/versions/VersionWizard.vue'
+import VersionCard from '../components/versions/VersionCard.vue'
+import VersionDetail from '../components/versions/VersionDetail.vue'
+import SplitBar from '../components/versions/SplitBar.vue'
 import { paginateItems } from '../utils/pagination.js'
 
 const DATASET_PAGE_SIZE = 50
@@ -201,39 +207,63 @@ const uploadFiles = async (files) => {
 
 // Versions state
 const versions = ref([])
-const wizardStep = ref(0)
-const splitTrain = ref(70)
-const splitValid = ref(20)
-const splitTest = ref(10)
-const preprocessing = ref(['resize'])
-const augmentations = ref(['flip'])
-const multiplier = ref(1)
-const splitTotal = computed(() => splitTrain.value + splitValid.value + splitTest.value)
+const showWizard = ref(false)
+const selectedVersion = ref(null)
 
-const generateVersion = async () => {
+const handleGenerateVersion = async (config) => {
   errorMessage.value = ''
   try {
-    await createDatasetVersion(projectId.value, {
-      name: 'Version ' + (versions.value.length + 1),
-      split: { train: splitTrain.value, valid: splitValid.value, test: splitTest.value },
-      preprocessing: [...preprocessing.value],
-      augmentations: [...augmentations.value],
-      multiplier: multiplier.value
-    })
+    await createDatasetVersion(projectId.value, config)
     versions.value = await listDatasetVersions(projectId.value)
-    wizardStep.value = 0
+    showWizard.value = false
   } catch (error) {
     errorMessage.value = 'Could not create dataset version.'
   }
 }
 
+const handleDeleteVersion = async (version) => {
+  if (!window.confirm(`Delete version "${version.name}"?`)) return
+  errorMessage.value = ''
+  try {
+    await deleteDatasetVersion(projectId.value, version.id)
+    versions.value = await listDatasetVersions(projectId.value)
+    if (selectedVersion.value?.id === version.id) {
+      selectedVersion.value = null
+    }
+  } catch (error) {
+    errorMessage.value = 'Could not delete version.'
+  }
+}
+
+const handleExportVersion = async ({ version, format }) => {
+  const fmt = format || 'yolo'
+  errorMessage.value = ''
+  try {
+    const blob = await exportDatasetVersion(projectId.value, version.id, fmt)
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `dataset_${version.name}_${fmt}.zip`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    errorMessage.value = 'Could not export version.'
+  }
+}
+
+const handleDuplicateVersion = (version) => {
+  showWizard.value = true
+}
+
 // Train state
-const selectedVersion = ref(null)
+const selectedTrainVersionId = ref(null)
 const trainingProgress = ref(0)
 const isTraining = ref(false)
 
 const startTraining = () => {
-  if (!selectedVersion.value) return
+  if (!selectedTrainVersionId.value) return
   isTraining.value = true
   trainingProgress.value = 0
   const interval = setInterval(() => {
@@ -390,41 +420,29 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEsc))
       <div v-if="activeTab === 'versions'" class="versions-view">
         <div class="versions-header">
           <h3>Versions</h3>
-          <button class="action-btn" @click="wizardStep = wizardStep ? 0 : 1">[Generate New Version]</button>
         </div>
         
-        <div v-if="wizardStep > 0" class="wizard-container">
-          <div v-if="wizardStep === 1" class="wizard-step">
-            <p>Train / Valid / Test split <span class="split-total" :class="{ invalid: splitTotal !== 100 }">(sum {{ splitTotal }}%)</span></p>
-            <div class="split-inputs">
-              <label>Train <input type="number" min="0" max="100" v-model.number="splitTrain" class="number-input" />%</label>
-              <label>Valid <input type="number" min="0" max="100" v-model.number="splitValid" class="number-input" />%</label>
-              <label>Test <input type="number" min="0" max="100" v-model.number="splitTest" class="number-input" />%</label>
-            </div>
-            <button class="action-btn" @click="wizardStep = 2" :disabled="splitTotal !== 100">[Next]</button>
-          </div>
-          <div v-if="wizardStep === 2" class="wizard-step">
-            <p>Preprocessing</p>
-            <label><input type="checkbox" value="resize" v-model="preprocessing" /> Resize</label>
-            <label><input type="checkbox" value="grayscale" v-model="preprocessing" /> Grayscale</label>
-            <button class="action-btn" @click="wizardStep = 3">[Next]</button>
-          </div>
-          <div v-if="wizardStep === 3" class="wizard-step">
-            <p>Augmentations</p>
-            <label><input type="checkbox" value="flip" v-model="augmentations" /> Flip</label>
-            <label><input type="checkbox" value="rotate" v-model="augmentations" /> Rotate</label>
-            <p>Multiplier: <input type="number" min="1" v-model.number="multiplier" class="number-input" /></p>
-            <button class="action-btn" @click="generateVersion">[Generate]</button>
-          </div>
+        <div v-if="showWizard">
+          <VersionWizard @generate="handleGenerateVersion" @cancel="showWizard = false" :projectId="projectId" />
         </div>
-
-        <ul class="version-list" v-if="versions.length > 0">
-          <li v-for="version in versions" :key="version.id">
-            {{ version.name }} - {{ version.asset_count }} annotated assets - {{ version.multiplier }}x
-          </li>
-        </ul>
-        <div v-else class="empty-state">
-          No versions generated yet.
+        <div v-else>
+          <div style="margin-bottom: 1.5rem;">
+            <button class="action-btn" @click="showWizard = true">[Generate New Version]</button>
+          </div>
+          <div class="version-cards-grid" v-if="versions.length > 0">
+            <VersionCard
+              v-for="version in versions"
+              :key="version.id"
+              :version="version"
+              @click="selectedVersion = version"
+              @delete="handleDeleteVersion"
+              @export="handleExportVersion"
+              @duplicate="handleDuplicateVersion"
+            />
+          </div>
+          <div v-else class="empty-state">
+            No versions generated yet.
+          </div>
         </div>
       </div>
 
@@ -437,13 +455,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEsc))
         </div>
         <div class="train-controls">
           <label>Select Version: 
-            <select v-model="selectedVersion" class="select-input">
+            <select v-model="selectedTrainVersionId" class="select-input">
               <option v-for="version in versions" :key="version.id" :value="version.id">
                 {{ version.name }}
               </option>
             </select>
           </label>
-          <button class="action-btn" @click="startTraining" :disabled="!selectedVersion || isTraining">[Start Training]</button>
+          <button class="action-btn" @click="startTraining" :disabled="!selectedTrainVersionId || isTraining">[Start Training]</button>
         </div>
         
         <div v-if="trainingProgress > 0" class="progress-container">
@@ -493,6 +511,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleEsc))
         </div>
       </div>
     </div>
+
+    <VersionDetail
+      :visible="!!selectedVersion"
+      :version="selectedVersion"
+      :projectId="projectId"
+      @close="selectedVersion = null"
+      @delete="handleDeleteVersion"
+      @export="handleExportVersion"
+    />
   </div>
 </template>
 

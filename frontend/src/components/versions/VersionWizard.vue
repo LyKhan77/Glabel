@@ -7,7 +7,7 @@
         :key="i"
         class="flex items-center gap-2"
         :class="currentStep === i + 1 ? 'text-blue-600' : (currentStep > i + 1 ? 'text-gray-800 cursor-pointer hover:text-blue-600' : 'text-gray-400')"
-        @click="if (currentStep > i + 1) currentStep = i + 1"
+        @click="currentStep > i + 1 ? currentStep = i + 1 : null"
       >
         <div class="w-6 h-6 rounded-full flex items-center justify-center border" 
              :class="currentStep === i + 1 ? 'border-blue-600 bg-blue-50' : (currentStep > i + 1 ? 'border-gray-800' : 'border-gray-300')">
