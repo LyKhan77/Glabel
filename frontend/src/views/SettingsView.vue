@@ -1,16 +1,23 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { listModels, downloadModel } from '@/api/client'
+import { listModels, downloadModel, detectHardware } from '../api/client.js'
 
 const sysInfo = ref(null)
+const recommendedModels = ref([])
 const models = ref([])
 const error = ref(null)
 const downloadingModels = ref(new Set())
 
-const detectSystem = () => {
-  // Mock detection
-  sysInfo.value = "Detected: Windows 11 | GPU: NVIDIA RTX 4090 (CUDA Available) | CPU: AMD Ryzen 9"
-  alert("System detected successfully. Once the backend is implemented, this will fetch real hardware information via WebSocket/API.")
+const detectSystem = async () => {
+  try {
+    sysInfo.value = { loading: true }
+    const hw = await detectHardware()
+    sysInfo.value = hw
+    recommendedModels.value = hw.recommended_models || []
+  } catch (err) {
+    alert("Hardware detection failed: " + err.message)
+    sysInfo.value = null
+  }
 }
 
 const loadModels = async () => {
@@ -68,7 +75,19 @@ onMounted(() => {
           </select>
           <button class="btn" @click="detectSystem">[Detect System]</button>
         </div>
-        <p v-if="sysInfo" class="desc sys-info">{{ sysInfo }}</p>
+        <div v-if="sysInfo && !sysInfo.loading" class="sys-info-box">
+          <p class="desc sys-detail"><strong>OS:</strong> {{ sysInfo.os }}</p>
+          <p class="desc sys-detail"><strong>CPU:</strong> {{ sysInfo.cpu }}</p>
+          <p class="desc sys-detail"><strong>RAM:</strong> {{ sysInfo.ram_gb }} GB</p>
+          <p v-if="sysInfo.gpu" class="desc sys-detail" style="color: #4caf50;">
+            <strong>GPU:</strong> {{ sysInfo.gpu }} 
+            <span v-if="sysInfo.vram_gb">({{ sysInfo.vram_gb }} GB VRAM)</span>
+          </p>
+          <div v-if="recommendedModels.length" class="recommendation-box">
+            <strong>★ Recommended Models:</strong> {{ recommendedModels.join(', ') }}
+          </div>
+        </div>
+        <p v-else-if="sysInfo?.loading" class="desc sys-info">Detecting hardware...</p>
       </div>
 
       <div class="settings-section">
@@ -92,6 +111,13 @@ onMounted(() => {
             </div>
             <div class="model-action">
               <span v-if="m.is_downloaded" class="status-available">[Available]</span>
+              
+              <template v-else-if="m.architecture.includes('SAM 3')">
+                <a href="https://huggingface.co/facebook/sam3" target="_blank" class="btn-small" style="text-decoration: none; display: inline-block;" title="Requires manual download from Hugging Face">
+                  [Manual DL]
+                </a>
+              </template>
+
               <button 
                 v-else-if="!downloadingModels.has(m.id)"
                 class="btn-small" 
@@ -176,6 +202,27 @@ select.austere-input option {
 .sys-info {
   margin-top: 0.5rem;
   color: #4caf50;
+}
+
+.sys-info-box {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px dashed var(--border-color, #646262);
+  background: rgba(100, 98, 98, 0.05);
+}
+
+.sys-detail {
+  margin: 0.2rem 0;
+  font-family: monospace;
+}
+
+.recommendation-box {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background: var(--text-color, #201d1d);
+  color: var(--bg-color, #fdfcfc);
+  font-size: 0.9rem;
+  border-radius: 4px;
 }
 
 .btn {

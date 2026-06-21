@@ -1,10 +1,18 @@
 import platform
 import psutil
+import subprocess
 
 try:
     import torch
 except ImportError:
     torch = None
+
+def get_windows_gpus():
+    try:
+        output = subprocess.check_output(['wmic', 'path', 'win32_VideoController', 'get', 'name'], text=True)
+        return [line.strip() for line in output.split('\n') if line.strip() and line.strip().lower() != 'name']
+    except Exception:
+        return []
 
 def detect_hardware() -> dict:
     info = {
@@ -27,6 +35,14 @@ def detect_hardware() -> dict:
             info["mps_available"] = True
             info["gpu"] = "Apple Silicon GPU"
             info["vram_gb"] = info["ram_gb"]  # Unified memory
+            
+    if not info["gpu"] and platform.system() == "Windows":
+        os_gpus = get_windows_gpus()
+        nvidia_gpus = [g for g in os_gpus if "nvidia" in g.lower()]
+        if nvidia_gpus:
+            info["gpu"] = f"{nvidia_gpus[0]} (CUDA Not Installed/Detected by PyTorch)"
+        elif os_gpus:
+            info["gpu"] = os_gpus[0]
             
     # Recommendations
     recs = []

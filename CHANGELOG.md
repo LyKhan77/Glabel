@@ -58,11 +58,111 @@ Use this structure for every new AI-agent change entry:
 - Commands run, tests run, manual checks, or "Not run" with reason.
 
 **Follow-up notes**
+# Glabel Changelog
+
+This file is the long-term memory ledger for Glabel across all AI agents. It records what the codebase can do now, why important changes were made, where the related code lives, what still needs validation, and how future agents must document their work.
+
+Use this file as the durable context bridge between sessions. Chat history can disappear, but this file should let the next agent understand the current product state and continue work without rediscovering old decisions.
+
+## Agent Memory Contract
+
+Every AI agent must treat this file as the source of truth for implemented codebase history.
+
+Read order for a new agent:
+
+1. Read `AGENTS.md` for operating rules.
+2. Read this file's `Current Codebase State` for the latest product capability map.
+3. Read the newest entries in `AI-Agent Change Entries` before touching related areas.
+4. Check `Pending Validation and Known Gaps` before claiming a workflow is fully verified.
+
+Update rules:
+
+- Update this file for every implemented behavior, architecture, model/CV stack, workflow, or major developer-documentation change.
+- Add new entries at the top of `AI-Agent Change Entries`, newest first.
+- Keep historical entries unless they are factually wrong; correct them with a new entry when possible.
+- Update `Current Codebase State` when a change affects the product capability map.
+- Do not record plans, ideas, or proposed work as completed changes.
+- Do not duplicate this changelog back into `AGENTS.md`; keep `AGENTS.md` as a pointer.
+
+## Required Entry Schema
+
+Use this structure for every new AI-agent change entry:
+
+```markdown
+### YYYY-MM-DD - Short change title
+
+**Agent scope**
+
+- Request: one sentence describing the user request.
+- Intent: one sentence describing why the change exists.
+- Status: Completed | Partially completed | Reverted | Superseded.
+
+**Changed files**
+
+- `path/to/file`: what changed in this file.
+
+**Behavior before**
+
+- Describe the previous behavior or documentation state.
+
+**What changed**
+
+- Concrete implemented changes only.
+
+**After the change**
+
+- Describe how the app, workflow, architecture, or agent memory behaves now.
+
+**Verification**
+
+- Commands run, tests run, manual checks, or "Not run" with reason.
+
+**Follow-up notes**
 
 - Remaining validation, risks, or related areas future agents should inspect.
 ```
 
 ## AI-Agent Change Entries
+
+### 2026-06-21 - Hardware Target Detection & Model Recommendation
+
+**Agent scope**
+
+- Request: Implement actual hardware detection replacing the mock data, including M-series (MPS) support and model recommendations.
+- Intent: Provide users with real-time insight into their system capabilities to guide them on which models they should download.
+- Status: Completed.
+
+**Changed files**
+
+- `backend/schemas/system.py`: Created `HardwareInfoResponse` schema.
+- `backend/services/system.py`: Created `detect_hardware()` using `psutil`, `platform`, and `torch` (for CUDA/MPS and VRAM).
+- `backend/api/v1/system.py`: Created `/api/v1/system/hardware` GET endpoint.
+- `backend/main.py`: Mounted the `system.router`.
+- `backend/tests/test_system_api.py`: Created endpoint tests.
+- `frontend/src/api/client.js`: Added `detectHardware()` wrapper.
+- `frontend/src/views/SettingsView.vue`: Connected `detectSystem` to the API and updated the UI to display the payload.
+
+**Behavior before**
+
+- Hardware detection in `SettingsView.vue` returned hardcoded mock data via `alert`.
+
+**What changed**
+
+- Dynamic detection of OS, CPU, RAM via `psutil`/`platform`.
+- Dynamic detection of GPU name, VRAM, and Apple Silicon MPS availability via `torch`.
+- Model recommendations based on VRAM capacity and GPU availability.
+
+**After the change**
+
+- Users click "Detect System" and see their real hardware specs along with an intelligent list of recommended models (e.g. YOLO26x / SAM 3 for 8GB+ VRAM).
+
+**Verification**
+
+- `pytest backend/tests/test_system_api.py -v` passed.
+
+**Follow-up notes**
+
+- None.
 
 ### 2026-06-21 - Models Manager Implementation
 

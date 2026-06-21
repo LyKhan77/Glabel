@@ -29,7 +29,7 @@ Open-source, **local-first** visual pipeline builder for Computer Vision (ComfyU
 
 ## Key Features · `[KEEP UPDATED]`
 
-- Done: VueFlow node canvas, app shell, frontend/backend project integration, atomic JSON storage, Projects CRUD API, dataset upload/video frame extraction, dataset bulk select/delete, annotating-to-unassigned return flow, autosaving task-aware annotation studio, annotation state, dataset versions with 4-step wizard/augmentation preview/YOLO/COCO export, `/health`.
+- Done: VueFlow node canvas, app shell, frontend/backend project integration, atomic JSON storage, Projects CRUD API, dataset upload/video frame extraction, dataset bulk select/delete, annotating-to-unassigned return flow, autosaving task-aware annotation studio, annotation state, dataset versions with 4-step wizard/augmentation preview/YOLO/COCO export, `/health`, Models Manager (YOLO, RT-DETR, SAM), Hardware Target Detection (OS, CPU, GPU).
 - Planned: WebSocket streaming, real SAM/YOLO annotation output, Ultralytics training lifecycle, image serving, Playground DAG execution.
 
 ## Project Structure · `[KEEP UPDATED]`
@@ -128,7 +128,7 @@ Full local app: install dependencies manually first, then `.\scripts\start-dev.p
 > **CRITICAL INSTRUCTION FOR AI AGENTS:**
 > All significant changes, feature additions, and updates MUST be documented in `CHANGELOG.md` which serves as the long-term cross-agent memory. Do not add new changelog entries directly here. Instead, you must explicitly update `CHANGELOG.md` and keep this section solely as a summary and pointer.
 
-**Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, paginated dataset browsing, and a task-aware annotation studio. Dataset version management is fully robust with a 4-step wizard, interactive OpenCV augmentation preview, VersionCard dashboard, slide-over detail panel, split generation, and full YOLO/COCO ZIP exports. Active branch `feat/enhance-openvision`.
+**Status:** Frontend/backend integration is wired for project CRUD, dataset upload, video frame extraction, paginated dataset browsing, and a task-aware annotation studio. Dataset version management is fully robust with a 4-step wizard, interactive OpenCV augmentation preview, VersionCard dashboard, slide-over detail panel, split generation, and full YOLO/COCO ZIP exports. Added Models Manager (Ultralytics downloader + SAM 3 manual support) and Hardware Target Detection (OS/CUDA/MPS). Active branch `feat/enhance-openvision`.
 
 **Detailed Log:** See `CHANGELOG.md` for a complete history of AI agent changes and updates.
 

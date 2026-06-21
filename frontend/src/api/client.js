@@ -151,3 +151,7 @@ export function downloadModel(modelId) {
     method: 'POST'
   })
 }
+
+export function detectHardware() {
+  return request('/api/v1/system/hardware')
+}

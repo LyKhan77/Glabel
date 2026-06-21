@@ -3,7 +3,7 @@ from typing import List
 from backend.schemas.models import ModelItem
 from backend.services.models import list_models, download_model
 
-router = APIRouter(prefix="/models", tags=["Models"])
+router = APIRouter(prefix="/api/v1/models", tags=["Models"])
 
 @router.get("", response_model=List[ModelItem])
 def get_all_models():
